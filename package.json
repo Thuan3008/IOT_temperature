@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "start": "npm --prefix backend run start",
+    "dev": "npm --prefix backend run dev",
+    "test:syntax": "node --check backend/src/app.js && node --check backend/src/mqttClient.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

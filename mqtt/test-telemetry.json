@@ -1,0 +1,17 @@
+{
+  "deviceId": "ESP32-01",
+  "tripId": "TRIP001",
+  "sensors": [
+    { "sensorId": "S1", "temperature": 4.2, "humidity": 65, "status": "ONLINE" },
+    { "sensorId": "S2", "temperature": 4.8, "humidity": 66, "status": "ONLINE" },
+    { "sensorId": "S3", "temperature": 5.1, "humidity": 66, "status": "ONLINE" },
+    { "sensorId": "S4", "temperature": 5.8, "humidity": 68, "status": "ONLINE" },
+    { "sensorId": "S5", "temperature": 5.3, "humidity": 67, "status": "ONLINE" }
+  ],
+  "door": "CLOSED",
+  "latitude": 10.762622,
+  "longitude": 106.660172,
+  "timestamp": "2026-09-10T10:30:00+07:00",
+  "isBuffered": false,
+  "type": "TELEMETRY"
+}

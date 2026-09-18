@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "author": "Smart Cold Chain",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -100, "left": 220, "attrs": { "temperature": "4.2", "humidity": "65" } },
+    { "type": "wokwi-dht22", "id": "dht2", "top": 0, "left": 220, "attrs": { "temperature": "4.8", "humidity": "66" } },
+    { "type": "wokwi-dht22", "id": "dht3", "top": 100, "left": 220, "attrs": { "temperature": "5.1", "humidity": "66" } },
+    { "type": "wokwi-dht22", "id": "dht4", "top": 200, "left": 220, "attrs": { "temperature": "5.8", "humidity": "68" } },
+    { "type": "wokwi-dht22", "id": "dht5", "top": 300, "left": 220, "attrs": { "temperature": "5.3", "humidity": "67" } }
+  ],
+  "connections": [
+    [ "esp:3V3", "dht1:VCC", "red", [] ], [ "esp:GND.1", "dht1:GND", "black", [] ], [ "esp:15", "dht1:SDA", "green", [] ],
+    [ "esp:3V3", "dht2:VCC", "red", [] ], [ "esp:GND.1", "dht2:GND", "black", [] ], [ "esp:16", "dht2:SDA", "green", [] ],
+    [ "esp:3V3", "dht3:VCC", "red", [] ], [ "esp:GND.1", "dht3:GND", "black", [] ], [ "esp:17", "dht3:SDA", "green", [] ],
+    [ "esp:3V3", "dht4:VCC", "red", [] ], [ "esp:GND.1", "dht4:GND", "black", [] ], [ "esp:18", "dht4:SDA", "green", [] ],
+    [ "esp:3V3", "dht5:VCC", "red", [] ], [ "esp:GND.1", "dht5:GND", "black", [] ], [ "esp:19", "dht5:SDA", "green", [] ]
+  ]
+}
