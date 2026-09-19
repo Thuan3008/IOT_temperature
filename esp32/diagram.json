@@ -11,6 +11,8 @@
     { "type": "wokwi-dht22", "id": "dht5", "top": 300, "left": 220, "attrs": { "temperature": "5.3", "humidity": "67" } }
   ],
   "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
     [ "esp:3V3", "dht1:VCC", "red", [] ], [ "esp:GND.1", "dht1:GND", "black", [] ], [ "esp:15", "dht1:SDA", "green", [] ],
     [ "esp:3V3", "dht2:VCC", "red", [] ], [ "esp:GND.1", "dht2:GND", "black", [] ], [ "esp:16", "dht2:SDA", "green", [] ],
     [ "esp:3V3", "dht3:VCC", "red", [] ], [ "esp:GND.1", "dht3:GND", "black", [] ], [ "esp:17", "dht3:SDA", "green", [] ],

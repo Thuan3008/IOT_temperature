@@ -1,4 +1,5 @@
 {
+  "messageId": "demo-ESP32-01-000001",
   "deviceId": "ESP32-01",
   "tripId": "TRIP001",
   "sensors": [

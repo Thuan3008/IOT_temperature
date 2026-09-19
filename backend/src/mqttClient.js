@@ -2,6 +2,7 @@ const mqtt = require("mqtt");
 const sql = require("mssql");
 
 const poolPromise = require("./db");
+const { evaluateTemperatureAlerts } = require("./services/temperatureAlertService");
 
 const TOPIC =
   "coldchain/v1/devices/+/telemetry";
@@ -20,6 +21,14 @@ function validateTelemetry(data, topic) {
     !["OPEN", "CLOSED"].includes(data.door)
   ) {
     throw new Error("Invalid telemetry payload");
+  }
+
+  if (
+    data.messageId !== undefined &&
+    (typeof data.messageId !== "string" ||
+      !/^[A-Za-z0-9._:-]{1,100}$/.test(data.messageId))
+  ) {
+    throw new Error("Invalid messageId");
   }
 
   if (
@@ -94,6 +103,24 @@ async function saveTelemetry(data, topic) {
   await transaction.begin();
 
   try {
+    if (data.messageId) {
+      const existing = await new sql.Request(transaction)
+        .input("deviceId", sql.VarChar(50), data.deviceId)
+        .input("messageId", sql.NVarChar(100), data.messageId)
+        .query(`
+          SELECT TOP 1 packet_id
+          FROM telemetry_packets
+          WHERE device_id = @deviceId AND message_id = @messageId
+        `);
+      if (existing.recordset.length) {
+        await transaction.rollback();
+        console.log(`Duplicate telemetry ignored: ${data.deviceId}/${data.messageId}`);
+        return { duplicate: true, packetId: existing.recordset[0].packet_id };
+      }
+    } else {
+      console.warn(`Telemetry from ${data.deviceId} has no messageId; duplicate detection unavailable`);
+    }
+
     const sensorIds = data.sensors.map((sensor) => sensor.sensorId);
     const relationResult = await new sql.Request(transaction)
       .input("deviceId", sql.VarChar(50), data.deviceId)
@@ -108,6 +135,15 @@ async function saveTelemetry(data, topic) {
       throw new Error("Device is not assigned to this trip");
     }
 
+    const tripResult = await new sql.Request(transaction)
+      .input("tripId", sql.VarChar(30), data.tripId)
+      .query(`
+        SELECT min_temperature, max_temperature, early_warning_minutes
+        FROM trips
+        WHERE trip_id = @tripId
+      `);
+    const trip = tripResult.recordset[0];
+
     const sensorRequest = new sql.Request(transaction)
       .input("deviceId", sql.VarChar(50), data.deviceId);
     sensorIds.forEach((sensorId, index) => sensorRequest.input(`sensor${index}`, sql.VarChar(20), sensorId));
@@ -120,10 +156,33 @@ async function saveTelemetry(data, topic) {
       throw new Error("Telemetry contains an unknown sensor");
     }
 
+    const historyBySensor = {};
+    for (const sensor of data.sensors) {
+      const history = await new sql.Request(transaction)
+        .input("deviceId", sql.VarChar(50), data.deviceId)
+        .input("tripId", sql.VarChar(30), data.tripId)
+        .input("sensorId", sql.VarChar(20), sensor.sensorId)
+        .input("measuredAt", sql.DateTimeOffset, new Date(data.timestamp))
+        .query(`
+          SELECT TOP 5 r.temperature, p.measured_at
+          FROM sensor_readings r
+          INNER JOIN telemetry_packets p ON p.packet_id = r.packet_id
+          WHERE r.device_id = @deviceId AND p.trip_id = @tripId
+            AND r.sensor_id = @sensorId AND r.temperature IS NOT NULL
+            AND r.sensor_status = 'ONLINE' AND p.measured_at < @measuredAt
+          ORDER BY p.measured_at DESC
+        `);
+      historyBySensor[sensor.sensorId] = history.recordset.map((row) => ({
+        temperature: row.temperature,
+        time: new Date(row.measured_at).getTime()
+      }));
+    }
+
     // Luu thong tin chung cua ban tin
     const packetResult = await new sql.Request(transaction)
       .input("deviceId", sql.VarChar(50), data.deviceId)
       .input("tripId", sql.VarChar(30), data.tripId)
+      .input("messageId", sql.NVarChar(100), data.messageId || null)
       .input("door", sql.VarChar(10), data.door)
       .input("latitude", sql.Float, data.latitude)
       .input("longitude", sql.Float, data.longitude)
@@ -137,6 +196,7 @@ async function saveTelemetry(data, topic) {
         INSERT INTO telemetry_packets (
           device_id,
           trip_id,
+          message_id,
           door_status,
           latitude,
           longitude,
@@ -148,6 +208,7 @@ async function saveTelemetry(data, topic) {
         VALUES (
           @deviceId,
           @tripId,
+          @messageId,
           @door,
           @latitude,
           @longitude,
@@ -189,14 +250,44 @@ async function saveTelemetry(data, topic) {
         `);
     }
 
+    const alerts = evaluateTemperatureAlerts({
+      sensors: data.sensors,
+      minTemperature: trip.min_temperature,
+      maxTemperature: trip.max_temperature,
+      earlyWarningMinutes: trip.early_warning_minutes,
+      historyBySensor,
+      measuredAt: data.timestamp
+    });
+    for (const alert of alerts) {
+      await new sql.Request(transaction)
+        .input("tripId", sql.VarChar(30), data.tripId)
+        .input("deviceId", sql.VarChar(50), data.deviceId)
+        .input("sensorId", sql.VarChar(20), alert.sensorId)
+        .input("packetId", sql.BigInt, packetId)
+        .input("alertType", sql.VarChar(50), alert.type)
+        .input("temperature", sql.Float, alert.temperature)
+        .input("threshold", sql.Float, alert.threshold)
+        .input("message", sql.NVarChar(500), alert.message)
+        .query(`
+          INSERT INTO alerts (trip_id, device_id, sensor_id, packet_id, alert_type, temperature, threshold_value, message)
+          VALUES (@tripId, @deviceId, @sensorId, @packetId, @alertType, @temperature, @threshold, @message)
+        `);
+    }
+
     await transaction.commit();
 
     console.log(
-      `Saved packet ${packetId}: ${data.sensors.length} sensors`
+      `Saved packet ${packetId}: ${data.sensors.length} sensors, ${alerts.length} alerts`
     );
 
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch { /* transaction may already be rolled back by SQL Server */ }
+    const errorNumber = error.number || error.originalError?.info?.number;
+    const errorText = `${error.message || ""} ${error.originalError?.info?.message || ""}`;
+    if ([2601, 2627].includes(errorNumber) && errorText.includes("UX_telemetry_device_message_id")) {
+      console.log(`Duplicate telemetry ignored: ${data.deviceId}/${data.messageId}`);
+      return { duplicate: true };
+    }
     throw error;
   }
 }

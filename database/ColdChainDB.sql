@@ -275,6 +275,9 @@ CREATE TABLE telemetry_packets (
 
     trip_id VARCHAR(30) NOT NULL,
 
+    -- Optional idempotency key; unique per device when present
+    message_id NVARCHAR(100) NULL,
+
     -- CLOSED / OPEN
     door_status VARCHAR(10),
 
@@ -434,6 +437,11 @@ GO
 
 CREATE INDEX IX_telemetry_device_time
 ON telemetry_packets(device_id, measured_at);
+GO
+
+CREATE UNIQUE INDEX UX_telemetry_device_message_id
+ON telemetry_packets(device_id, message_id)
+WHERE message_id IS NOT NULL;
 GO
 
 CREATE INDEX IX_readings_sensor

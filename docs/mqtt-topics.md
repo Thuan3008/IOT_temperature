@@ -8,4 +8,4 @@
  - `coldchain/v1/devices/{deviceId}/command`: backend commands.
  - `coldchain/v1/trips/{tripId}/telemetry`: reserved for trip-level consumers.
 
- The current official payload is `mqtt/test-telemetry.json`, with exactly five sensor objects. The current contract has no message ID, so duplicate delivery is not fully preventable. Add `messageId` or a device `sequenceNumber` in the next compatible contract version and enforce a unique key in SQL Server.
+ The official payload is `mqtt/test-telemetry.json`, with exactly five sensor objects and a `messageId`. The field is optional for backward compatibility; messages without it are accepted but cannot be deduplicated. For messages with an ID, SQL Server enforces uniqueness on `(device_id, message_id)`. ESP32 creates a boot nonce plus increasing sequence value; each buffered payload is saved with its ID and `isBuffered: true`, then replayed FIFO with QoS 1 until PUBACK. The queue record is removed only after the PUBACK exchange succeeds.

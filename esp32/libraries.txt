@@ -1,3 +1,4 @@
-DHT sensor library
-PubSubClient
+DHT sensor library for ESPx (DHTesp)
 ArduinoJson
+MQTT by 256dpi (QoS 1 PUBACK support)
+LittleFS (built into the ESP32 Arduino framework)
