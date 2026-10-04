@@ -1,0 +1,11 @@
+.business-hint{font-size:12px;color:var(--color-text-3);line-height:1.6}
+.business-dialog{width:min(580px,calc(100% - 24px));max-height:85vh;overflow:auto;border:1px solid #dce5ec;border-radius:16px;padding:24px;background:white;color:#1e293b;box-shadow:0 20px 70px #0f172a40}
+.business-dialog::backdrop{background:#0f172a80}
+.business-dialog-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:20px}
+.business-dialog-heading h2{font-size:18px;margin:0}
+.business-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.business-fields .form-input{display:block;width:100%;margin-top:7px}
+.business-wide{grid-column:1/-1}
+.business-defaults{background:#eef8f5;color:#166b58;font-size:12px;padding:12px;border-radius:8px}
+.business-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+@media(max-width:520px){.business-fields{grid-template-columns:1fr}.business-dialog{padding:18px}.business-dialog-heading h2{font-size:16px}}

@@ -1,2 +1,88 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#102d35" /><meta name="description" content="Dashboard giám sát chuỗi lạnh IoT theo thời gian thực" /><title>Smart Cold Chain | Dashboard</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f2830" />
+    <meta name="description" content="Dashboard giám sát chuỗi lạnh IoT thông minh — Theo dõi nhiệt độ, độ ẩm và trạng thái cửa khoang lạnh theo thời gian thực." />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❄</text></svg>" />
+    <title>Smart Cold Chain | Dashboard IoT</title>
+
+    <!-- Loading screen inline styles — removed once React mounts -->
+    <style>
+      #app-loading {
+        position: fixed; inset: 0;
+        background: #0f2830;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 18px;
+        font-family: 'Inter', system-ui, sans-serif;
+        color: white;
+        z-index: 9999;
+        transition: opacity 0.4s;
+      }
+      #app-loading .loading-icon {
+        font-size: 44px;
+        animation: spin 3s linear infinite;
+      }
+      #app-loading .loading-title {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+      }
+      #app-loading .loading-sub {
+        font-size: 12px;
+        color: rgba(255,255,255,0.45);
+      }
+      #app-loading .loading-bar {
+        width: 200px; height: 3px;
+        background: rgba(255,255,255,0.12);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      #app-loading .loading-bar-fill {
+        height: 100%;
+        background: #0d9488;
+        border-radius: 2px;
+        animation: load 1.4s ease infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes load {
+        0%   { width: 0%; margin-left: 0; }
+        50%  { width: 100%; margin-left: 0; }
+        100% { width: 0%; margin-left: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading screen -->
+    <div id="app-loading" aria-live="polite" aria-label="Đang tải ứng dụng">
+      <div class="loading-icon">❄</div>
+      <div class="loading-title">Smart Cold Chain IoT</div>
+      <div class="loading-sub">Đang khởi tạo hệ thống giám sát…</div>
+      <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+    </div>
+
+    <!-- React root -->
+    <div id="root"></div>
+
+    <!-- Hide loading once React has painted -->
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const loader = document.getElementById('app-loading');
+        const observer = new MutationObserver(() => {
+          const root = document.getElementById('root');
+          if (root && root.childElementCount > 0) {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.remove(), 400);
+            observer.disconnect();
+          }
+        });
+        observer.observe(document.getElementById('root'), { childList: true });
+      });
+    </script>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

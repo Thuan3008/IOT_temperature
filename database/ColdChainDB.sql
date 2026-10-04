@@ -64,6 +64,10 @@ CREATE TABLE storage_profiles (
 
     max_temperature FLOAT NOT NULL,
 
+    early_warning_minutes INT NOT NULL DEFAULT 10,
+
+    max_door_open_seconds INT NOT NULL DEFAULT 30,
+
     description NVARCHAR(500),
 
     CONSTRAINT CK_profile_temp
@@ -125,7 +129,7 @@ CREATE TABLE trips (
         DEFAULT 10,
 
     max_door_open_seconds INT NOT NULL
-        DEFAULT 120,
+        DEFAULT 30,
 
     -- IDLE, ARMED, IN_TRANSIT, COMPLETED
     trip_state VARCHAR(20) NOT NULL
@@ -411,6 +415,13 @@ CREATE TABLE alerts (
     created_at DATETIME2 NOT NULL
         DEFAULT SYSUTCDATETIME(),
 
+    status VARCHAR(20) NOT NULL
+        CONSTRAINT DF_alerts_status DEFAULT 'OPEN',
+
+    resolved_at DATETIMEOFFSET NULL,
+
+    CONSTRAINT CK_alerts_status CHECK (status IN ('OPEN', 'RESOLVED')),
+
     FOREIGN KEY (trip_id)
         REFERENCES trips(trip_id),
 
@@ -536,7 +547,7 @@ VALUES (
     3.0,
     8.0,
     10,
-    120,
+    30,
     'IN_TRANSIT',
     0
 );

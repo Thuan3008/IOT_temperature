@@ -5,7 +5,9 @@ const cors = require("cors");
 
 const poolPromise = require("./db");
 const startMqtt = require("./mqttClient");
+const { startTimeoutMonitor } = require("./timeoutMonitor");
 const telemetryRoutes = require("./routes/telemetryRoutes");
+const controlRoutes = require("./routes/controlRoutes");
 
 const app = express();
 
@@ -37,6 +39,7 @@ app.get("/api/health", async (req, res) => {
 });
 
 app.use("/api", telemetryRoutes);
+app.use("/api/control", controlRoutes);
 
 async function start() {
   const port = process.env.PORT || 3000;
@@ -44,6 +47,7 @@ async function start() {
   try { await poolPromise; }
   catch (error) { console.error(`Database unavailable: ${error.message}`); }
   startMqtt();
+  startTimeoutMonitor();
 }
 
 start();

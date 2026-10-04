@@ -1,0 +1,80 @@
+/* ============================================================
+   TripMap Component Styles
+   (Overrides + extras not covered by global style.css)
+   ============================================================ */
+
+.trip-map-panel { margin-bottom: 20px; }
+
+.trip-map-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-lg, 14px) var(--radius-lg, 14px);
+}
+
+/* Ensure Leaflet tiles never clip */
+.trip-map-wrapper .leaflet-container img {
+  max-width: none !important;
+}
+
+/* Truck marker pin */
+.trip-truck-icon  { background: none; border: 0; }
+.trip-truck-pin {
+  width: 46px;
+  height: 46px;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 4px;
+  background: #0d9488;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.5);
+  transform: rotate(-45deg);
+  display: grid;
+  place-items: center;
+  color: white;
+}
+.trip-truck-pin svg {
+  width: 30px;
+  height: 30px;
+  transform: rotate(45deg);
+}
+
+/* Popup */
+.trip-map-popup {
+  min-width: 220px;
+  font-family: 'Inter', sans-serif;
+  color: #0f172a;
+}
+.trip-map-popup > strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #0f172a;
+}
+.trip-map-popup dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 14px;
+  font-size: 12px;
+  margin: 0;
+}
+.trip-map-popup dt { color: #64748b; }
+.trip-map-popup dd { margin: 0; text-align: right; font-weight: 500; }
+
+/* No-GPS placeholder */
+.trip-map-placeholder {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: white;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-size: 11px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+  z-index: 500;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+@media (max-width: 680px) {
+  .trip-map-wrapper .trip-map-canvas { height: 320px; }
+  .trip-map-popup { min-width: 180px; }
+}

@@ -3,20 +3,44 @@
   "author": "Smart Cold Chain",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    { "type": "wokwi-dht22", "id": "dht1", "top": -100, "left": 220, "attrs": { "temperature": "4.2", "humidity": "65" } },
-    { "type": "wokwi-dht22", "id": "dht2", "top": 0, "left": 220, "attrs": { "temperature": "4.8", "humidity": "66" } },
-    { "type": "wokwi-dht22", "id": "dht3", "top": 100, "left": 220, "attrs": { "temperature": "5.1", "humidity": "66" } },
-    { "type": "wokwi-dht22", "id": "dht4", "top": 200, "left": 220, "attrs": { "temperature": "5.8", "humidity": "68" } },
-    { "type": "wokwi-dht22", "id": "dht5", "top": 300, "left": 220, "attrs": { "temperature": "5.3", "humidity": "67" } }
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 100, "left": -20, "attrs": {} },
+
+    { "type": "wokwi-dht22", "id": "dht1", "top": -120, "left": 280, "attrs": { "temperature": "4.2", "humidity": "65" } },
+    { "type": "wokwi-resistor", "id": "rPull1", "top": -40, "left": 220, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-dht22", "id": "dht2", "top": 60, "left": 280, "attrs": { "temperature": "4.8", "humidity": "66" } },
+    { "type": "wokwi-resistor", "id": "rPull2", "top": 140, "left": 220, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-dht22", "id": "dht3", "top": -30, "left": 500, "attrs": { "temperature": "5.1", "humidity": "66" } },
+    { "type": "wokwi-resistor", "id": "rPull3", "top": 50, "left": 440, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-dht22", "id": "dht4", "top": -120, "left": 720, "attrs": { "temperature": "5.8", "humidity": "68" } },
+    { "type": "wokwi-resistor", "id": "rPull4", "top": -40, "left": 660, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-dht22", "id": "dht5", "top": 60, "left": 720, "attrs": { "temperature": "5.3", "humidity": "67" } },
+    { "type": "wokwi-resistor", "id": "rPull5", "top": 140, "left": 660, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-led", "id": "ledGreen", "top": 420, "left": -20, "attrs": { "color": "green", "label": "MQTT" } },
+    { "type": "wokwi-resistor", "id": "rGreen", "top": 480, "left": -30, "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led", "id": "ledRed", "top": 420, "left": 60, "attrs": { "color": "red", "label": "ALARM" } },
+    { "type": "wokwi-resistor", "id": "rRed", "top": 480, "left": 50, "attrs": { "value": "220" } },
+
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 415, "left": 150, "attrs": { "volume": "0.2" } },
+    { "type": "wokwi-pushbutton", "id": "doorBtn", "top": 420, "left": 250, "attrs": { "color": "blue", "label": "Door (hold 5s)", "key": "D", "bounce": "0" } }
   ],
   "connections": [
     [ "esp:TX0", "$serialMonitor:RX", "", [] ],
     [ "esp:RX0", "$serialMonitor:TX", "", [] ],
-    [ "esp:3V3", "dht1:VCC", "red", [] ], [ "esp:GND.1", "dht1:GND", "black", [] ], [ "esp:15", "dht1:SDA", "green", [] ],
-    [ "esp:3V3", "dht2:VCC", "red", [] ], [ "esp:GND.1", "dht2:GND", "black", [] ], [ "esp:16", "dht2:SDA", "green", [] ],
-    [ "esp:3V3", "dht3:VCC", "red", [] ], [ "esp:GND.1", "dht3:GND", "black", [] ], [ "esp:17", "dht3:SDA", "green", [] ],
-    [ "esp:3V3", "dht4:VCC", "red", [] ], [ "esp:GND.1", "dht4:GND", "black", [] ], [ "esp:18", "dht4:SDA", "green", [] ],
-    [ "esp:3V3", "dht5:VCC", "red", [] ], [ "esp:GND.1", "dht5:GND", "black", [] ], [ "esp:19", "dht5:SDA", "green", [] ]
-  ]
+    [ "esp:3V3", "dht1:VCC", "red", [] ], [ "esp:GND.1", "dht1:GND", "black", [] ], [ "esp:D13", "dht1:SDA", "green", [] ], [ "esp:3V3", "rPull1:1", "red", [] ], [ "rPull1:2", "dht1:SDA", "green", [] ],
+    [ "esp:3V3", "dht2:VCC", "red", [] ], [ "esp:GND.1", "dht2:GND", "black", [] ], [ "esp:D14", "dht2:SDA", "green", [] ], [ "esp:3V3", "rPull2:1", "red", [] ], [ "rPull2:2", "dht2:SDA", "green", [] ],
+    [ "esp:3V3", "dht3:VCC", "red", [] ], [ "esp:GND.1", "dht3:GND", "black", [] ], [ "esp:D25", "dht3:SDA", "green", [] ], [ "esp:3V3", "rPull3:1", "red", [] ], [ "rPull3:2", "dht3:SDA", "green", [] ],
+    [ "esp:3V3", "dht4:VCC", "red", [] ], [ "esp:GND.1", "dht4:GND", "black", [] ], [ "esp:D26", "dht4:SDA", "green", [] ], [ "esp:3V3", "rPull4:1", "red", [] ], [ "rPull4:2", "dht4:SDA", "green", [] ],
+    [ "esp:3V3", "dht5:VCC", "red", [] ], [ "esp:GND.1", "dht5:GND", "black", [] ], [ "esp:D27", "dht5:SDA", "green", [] ], [ "esp:3V3", "rPull5:1", "red", [] ], [ "rPull5:2", "dht5:SDA", "green", [] ],
+    [ "esp:D32", "doorBtn:1.l", "blue", [] ], [ "esp:GND.1", "doorBtn:2.l", "black", [] ],
+    [ "esp:D18", "rRed:1", "red", [] ], [ "rRed:2", "ledRed:A", "red", [] ], [ "ledRed:C", "esp:GND.1", "black", [] ],
+    [ "esp:D23", "rGreen:1", "green", [] ], [ "rGreen:2", "ledGreen:A", "green", [] ], [ "ledGreen:C", "esp:GND.1", "black", [] ],
+    [ "esp:D19", "buzzer:1", "orange", [] ], [ "buzzer:2", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
 }

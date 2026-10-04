@@ -8,4 +8,12 @@ Backend dùng `mssql` connection pool và transaction cho mỗi telemetry packet
 
 Trong transaction lưu telemetry, Backend đọc ngưỡng min/max và `early_warning_minutes` đã cấu hình trên chuyến. Mỗi cảm biến ONLINE ngoài ngưỡng tạo `TEMPERATURE_EXCURSION`; nếu ít nhất ba điểm đo cho thấy xu hướng tuyến tính dự kiến chạm ngưỡng trong khoảng cảnh báo thì tạo `EARLY_WARNING`. Alert gắn với packet/sensor và được commit hoặc rollback cùng packet/readings. API `GET /api/alerts` hỗ trợ lọc bằng `?tripId=TRIP001`.
 
-ESP32 ghi payload chờ gửi thành từng file FIFO trong LittleFS; khi Wi-Fi/MQTT mất vẫn lấy mẫu, khi kết nối lại phát lại theo thứ tự với QoS 1. `isBuffered` được đặt true cho payload lưu hàng đợi; bản ghi chỉ bị xóa sau PUBACK. Mỗi retry giữ nguyên messageId, nên nếu PUBACK bị mất sau khi backend đã nhận, backend chống lưu trùng qua unique index. Hàng đợi giới hạn 512 bản ghi và không tự ghi đè dữ liệu cũ khi đầy.
+Backend có timeout monitor chạy mỗi 15 giây. Monitor giữ `lastSeen` trong RAM cho thiết bị và từng cảm biến có dữ liệu ONLINE; quá 30 giây sẽ cập nhật trạng thái `OFFLINE`, tạo `DEVICE_OFFLINE` hoặc `SENSOR_OFFLINE` và gửi Telegram nếu được bật. Các khoảng thời gian có thể đổi bằng `DEVICE_TIMEOUT_SECONDS`, `SENSOR_TIMEOUT_SECONDS` và `OFFLINE_SCAN_INTERVAL_SECONDS` trong `.env`.
+
+Backend cũng subscribe `coldchain/v1/devices/+/status`. Khi Broker phát LWT `OFFLINE`, backend đánh dấu thiết bị và các cảm biến của nó `OFFLINE` ngay, ghi `DEVICE_OFFLINE` cho chuyến đang hoạt động. Gói `ONLINE` và telemetry hợp lệ phục hồi trạng thái. Timeout 30 giây là đường dự phòng khi không nhận được LWT. Dashboard lấy trạng thái từ API `/api/devices` và `/api/sensors`; cảm biến offline hiện `N/A` thay vì số đo của packet trước.
+
+ESP32 lấy mẫu năm DHT22 mỗi 10 giây, giám sát cửa và phát cảnh báo cục bộ. Khi Wi-Fi/MQTT mất, telemetry được lưu trong Ring Buffer RAM 30 phần tử; queue đầy thì ghi đè dữ liệu cũ nhất. Khi kết nối lại, firmware phát lại FIFO và đặt `isBuffered:true`. Queue mất khi reset/mất điện. Firmware dùng PubSubClient QoS 0; publish thành công không phải xác nhận broker hoặc backend đã nhận.
+
+Device nhận cấu hình từ topic `command`, publish cảnh báo và trạng thái, đồng thời đặt MQTT Last Will `OFFLINE`. Tọa độ GPS là tuyến mô phỏng trong TP.HCM. Firmware kiểm tra ngưỡng riêng từng vùng và trạng thái cửa; backend vẫn chịu trách nhiệm cảnh báo xu hướng tuyến tính `EARLY_WARNING`.
+
+Backend xử lý telemetry theo thứ tự, giữ hàng đợi riêng cho trạng thái và cho từng loại cảnh báo MQTT của mỗi thiết bị. Các lệnh gửi Telegram được thực hiện lần lượt; cảnh báo cửa và offline được ưu tiên trước cảnh báo nhiệt độ đang chờ, để tin không chồng lên nhau và cảnh báo khẩn không bị kẹt sau telemetry.

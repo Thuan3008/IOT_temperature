@@ -1,0 +1,405 @@
+/* ============================================================
+   DriverView.css — Chế độ lái xe
+   Thiết kế: full-screen, zero cuộn, chữ to, tương phản cao
+   ============================================================ */
+
+/* ── Shell: chiếm toàn bộ viewport ── */
+.dv-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #0f2830;
+}
+
+/* ── Bản đồ toàn màn hình ── */
+.dv-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.dv-map .leaflet-container img { max-width: none !important; }
+
+/* ── Alert bar (cảnh báo khẩn) ── */
+.dv-alert-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  background: #dc2626;
+  color: white;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 16px rgba(220,38,38,0.6);
+}
+
+.dv-alert-icon  { font-size: 20px; flex-shrink: 0; }
+.dv-alert-text  { flex: 1; }
+.dv-alert-blink {
+  font-size: 18px;
+  animation: blink 0.8s step-start infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Exit button ── */
+.dv-exit-btn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 300;
+  background: rgba(15, 40, 48, 0.88);
+  backdrop-filter: blur(6px);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+}
+.dv-exit-btn:hover {
+  background: rgba(220,38,38,0.75);
+  color: white;
+  border-color: rgba(220,38,38,0.5);
+}
+
+/* ── Left panel: sensor temperatures ── */
+.dv-sensor-panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 100;
+  width: 200px;
+  background: rgba(15, 40, 48, 0.90);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 14px 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Shift down when alert bar visible */
+.dv-alert-bar ~ .dv-sensor-panel { top: 58px; }
+
+.dv-panel-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.40);
+  text-transform: uppercase;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 2px;
+}
+
+/* ── Individual sensor row ── */
+.dv-sensor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid transparent;
+  transition: background 0.15s;
+}
+
+.dv-sensor-ok     { border-color: rgba(34,197,94,0.25); }
+.dv-sensor-warn   { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.4); }
+.dv-sensor-danger { background: rgba(239,68,68,0.20); border-color: rgba(239,68,68,0.5); animation: flash-row 1.2s ease infinite; }
+.dv-sensor-offline{ opacity: 0.45; }
+
+@keyframes flash-row {
+  0%, 100% { background: rgba(239,68,68,0.20); }
+  50%       { background: rgba(239,68,68,0.40); }
+}
+
+.dv-sensor-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(13,148,136,0.30);
+  color: #5eead4;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.dv-sensor-ok .dv-sensor-badge     { background: rgba(34,197,94,0.20); color: #4ade80; }
+.dv-sensor-warn .dv-sensor-badge   { background: rgba(245,158,11,0.25); color: #fcd34d; }
+.dv-sensor-danger .dv-sensor-badge { background: rgba(239,68,68,0.30); color: #fca5a5; }
+
+.dv-sensor-body { flex: 1; min-width: 0; }
+
+.dv-sensor-name {
+  font-size: 9px;
+  color: rgba(255,255,255,0.40);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-sensor-temp {
+  font-size: 20px;
+  font-weight: 800;
+  color: white;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+.dv-sensor-ok .dv-sensor-temp     { color: #4ade80; }
+.dv-sensor-warn .dv-sensor-temp   { color: #fcd34d; }
+.dv-sensor-danger .dv-sensor-temp { color: #fca5a5; }
+
+.dv-sensor-hum {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.dv-sensor-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dv-sensor-status-dot.online  { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,0.25); }
+.dv-sensor-status-dot.offline { background: #64748b; }
+
+/* Threshold box */
+.dv-threshold {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 0;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.dv-threshold-label {
+  font-size: 9px;
+  color: rgba(255,255,255,0.30);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.dv-threshold-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f59e0b;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Right panel: door / mode / trip ── */
+.dv-status-panel {
+  position: absolute;
+  bottom: 44px;
+  right: 14px;
+  z-index: 100;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Door card ── */
+.dv-door-card {
+  background: rgba(15, 40, 48, 0.90);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 2px solid transparent;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+}
+
+.dv-door-card.ok     { border-color: rgba(34,197,94,0.35); }
+.dv-door-card.warn   { border-color: rgba(245,158,11,0.5);  background: rgba(245,158,11,0.12); }
+.dv-door-card.danger { border-color: rgba(220,38,38,0.7);   background: rgba(220,38,38,0.18);  animation: flash-border 1s ease infinite; }
+
+@keyframes flash-border {
+  0%, 100% { border-color: rgba(220,38,38,0.7); }
+  50%       { border-color: rgba(255,100,100,1); }
+}
+
+.dv-door-icon { font-size: 28px; flex-shrink: 0; }
+
+.dv-door-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.40);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.dv-door-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: 0.02em;
+}
+
+.dv-door-card.ok .dv-door-value   { color: #4ade80; }
+.dv-door-card.warn .dv-door-value { color: #fcd34d; }
+.dv-door-card.danger .dv-door-value{ color: #fca5a5; }
+
+.dv-door-alert {
+  font-size: 10px;
+  color: #fca5a5;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+/* ── Mode card ── */
+.dv-mode-card {
+  background: rgba(15, 40, 48, 0.90);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.dv-mode-card.delivery-on  { border-color: rgba(13,148,136,0.5); background: rgba(13,148,136,0.15); }
+.dv-mode-card.delivery-off { border-color: rgba(255,255,255,0.08); }
+
+.dv-mode-icon  { font-size: 24px; flex-shrink: 0; }
+.dv-mode-label { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: rgba(255,255,255,0.35); text-transform: uppercase; margin-bottom: 2px; }
+.dv-mode-value { font-size: 14px; font-weight: 800; color: white; letter-spacing: 0.03em; }
+.dv-mode-card.delivery-on .dv-mode-value { color: #5eead4; }
+
+/* ── Trip card ── */
+.dv-trip-card {
+  background: rgba(15, 40, 48, 0.90);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.dv-trip-label { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: rgba(255,255,255,0.30); text-transform: uppercase; margin-bottom: 2px; }
+.dv-trip-value { font-size: 17px; font-weight: 800; color: white; letter-spacing: -0.2px; }
+.dv-plate      { font-size: 11px; color: rgba(255,255,255,0.40); margin-top: 3px; font-weight: 600; }
+
+/* ── GPS card ── */
+.dv-gps-card {
+  background: rgba(15, 40, 48, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  padding: 9px 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+
+.dv-gps-label { font-size: 10px; color: rgba(255,255,255,0.35); margin-bottom: 2px; }
+.dv-gps-time  { font-size: 15px; font-weight: 700; color: white; font-family: 'JetBrains Mono', monospace; }
+.dv-gps-none  { font-size: 10px; color: rgba(255,255,255,0.30); margin-top: 2px; }
+
+/* ── Truck marker pin ── */
+.dv-truck-pin {
+  width: 52px;
+  height: 52px;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 4px;
+  background: #0d9488;
+  box-shadow: 0 4px 18px rgba(13,148,136,0.55);
+  transform: rotate(-45deg);
+  display: grid;
+  place-items: center;
+  color: white;
+}
+.dv-truck-pin svg { width: 32px; height: 32px; transform: rotate(45deg); }
+
+/* ── Bottom bar ── */
+.dv-bottom-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(15, 40, 48, 0.80);
+  backdrop-filter: blur(8px);
+  color: rgba(255,255,255,0.40);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 7px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dv-ticker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── No-GPS overlay ── */
+.dv-no-gps {
+  position: absolute;
+  bottom: 55px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: rgba(15,40,48,0.80);
+  backdrop-filter: blur(6px);
+  color: rgba(255,255,255,0.55);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+/* ── Responsive: mobile (dashboard nhỏ, vẫn không scroll) ── */
+@media (max-width: 700px) {
+  .dv-sensor-panel {
+    width: 165px;
+    top: 10px;
+    left: 10px;
+    padding: 10px 8px;
+  }
+  .dv-sensor-temp    { font-size: 17px; }
+  .dv-sensor-badge   { width: 26px; height: 26px; font-size: 10px; }
+  .dv-status-panel   { width: 155px; right: 10px; bottom: 40px; gap: 7px; }
+  .dv-door-value     { font-size: 16px; }
+  .dv-door-card,
+  .dv-mode-card      { padding: 10px 12px; }
+  .dv-door-icon      { font-size: 22px; }
+  .dv-exit-btn       { font-size: 11px; padding: 7px 12px; top: 10px; right: 10px; }
+  .dv-alert-bar      { font-size: 13px; }
+}

@@ -5,6 +5,11 @@
     "test:syntax": "node --check backend/src/app.js && node --check backend/src/mqttClient.js"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
     "nodemon": "^3.1.14"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^5.0.0"
   }
 }
