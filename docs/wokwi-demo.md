@@ -53,6 +53,7 @@ coldchain/v1/devices/ESP32-01/telemetry
 coldchain/v1/devices/ESP32-01/alert
 coldchain/v1/devices/ESP32-01/status
 coldchain/v1/devices/ESP32-01/command
+coldchain/v1/devices/ESP32-01/ack
 ```
 
 Dùng `mosquitto_sub` để xem dữ liệu và cảnh báo (đổi thông tin đăng nhập theo broker):
@@ -64,10 +65,12 @@ mosquitto_sub -h 127.0.0.1 -p 1883 -u tester -P '<password>' -t 'coldchain/v1/de
 Gửi cấu hình ngưỡng và chế độ giao hàng:
 
 ```powershell
-mosquitto_pub -h 127.0.0.1 -p 1883 -u tester -P '<password>' -t coldchain/v1/devices/ESP32-01/command -m '{"tripId":"TRIP001","tripState":"IN_TRANSIT","profileId":"VEGETABLE_CHILLED","Tmin":3.0,"Tmax":8.0,"earlyWarningMinutes":10,"maxDoorOpenSeconds":30,"deliveryMode":false}'
+mosquitto_pub -h 127.0.0.1 -p 1883 -u tester -P '<password>' -t coldchain/v1/devices/ESP32-01/command -m '{"commandId":"manual-001","tripId":"TRIP001","tripState":"IN_TRANSIT","profileId":"VEGETABLE_CHILLED","Tmin":3.0,"Tmax":8.0,"earlyWarningMinutes":10,"maxDoorOpenSeconds":30,"deliveryMode":false}'
 ```
 
 Lệnh chỉ được áp dụng nếu JSON và ngưỡng hợp lệ. `tripState` và `deliveryMode` là hai cài đặt độc lập. Storage Profile mang tên và ngưỡng giám sát, firmware không điều khiển máy lạnh. `earlyWarningMinutes` được firmware giữ làm cấu hình nhưng dự báo cảnh báo sớm hiện do backend tính từ lịch sử.
+
+Sau khi áp dụng, Serial in `Command ACK APPLIED` và topic `.../ack` có bản tin cùng `commandId`. Nếu ESP32 từ chối, ACK có `status: REJECTED` và `reason`. Dashboard chờ tối đa 25 giây; hết hạn chỉ có nghĩa chưa xác nhận. Sau khi sửa firmware hoặc ACL, build lại `pio run -e wokwi`, khởi động lại mô phỏng, Mosquitto và Backend để nạp cấu hình mới.
 
 PubSubClient publish telemetry/alert/status ở QoS 0. Vì vậy `publish()` thành công chỉ cho biết thư viện đã chấp nhận gửi, không xác nhận broker hay backend đã xử lý gói. Ring Buffer lưu trong RAM, mất khi reset/mất điện; đầy sẽ ghi đè gói cũ nhất. LWT được Broker phát khi phát hiện kết nối MQTT bị mất bất thường.
 
@@ -84,7 +87,7 @@ PubSubClient publish telemetry/alert/status ở QoS 0. Vì vậy `publish()` th�
 | Khôi phục | Gõ `WIFI_ON` | Thiết bị kết nối lại và lần lượt phát lại hàng đợi với `isBuffered:true` |
 | Lỗi cảm biến | Gõ `SENSOR_FAIL S2`, sau đó `SENSOR_RECOVER S2` | S2 mang trạng thái FAULT với nhiệt độ/độ ẩm null; các cảm biến khác tiếp tục gửi |
 
-Nút nhấn hoạt động theo kiểu nhấn một lần mở, nhấn lần nữa đóng. Nhiệt độ/độ ẩm DHT22 được chỉnh trực tiếp trong Wokwi: bấm vào từng cảm biến và sửa thuộc tính. Đọc DHT22 theo chu kỳ 10 giây để tránh vi phạm giới hạn tốc độ cảm biến.
+Nút nhấn hoạt động theo kiểu nhấn một lần mở, nhấn lần nữa đóng. Nhiệt độ/độ ẩm DHT22 được chỉnh trực tiếp trong Wokwi: bấm vào từng cảm biến và sửa thuộc tính. Firmware đọc DHT22 theo chu kỳ 4 giây; Dashboard nhận mẫu mới qua luồng trực tiếp và cập nhật lịch sử từ SQL mỗi 5 giây.
 
 Các lệnh Serial không phân biệt hoa thường cho WIFI_ON/OFF; lệnh cảm biến dùng ID S1–S5. Serial Monitor cũng in trạng thái Wi-Fi/MQTT, cửa, cảm biến và số phần tử đang đệm.
 

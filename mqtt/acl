@@ -2,14 +2,17 @@ user backend
 topic read coldchain/v1/devices/+/telemetry
 topic read coldchain/v1/devices/+/status
 topic read coldchain/v1/devices/+/alert
+topic read coldchain/v1/devices/+/ack
 topic write coldchain/v1/devices/+/command
 user esp32
 topic write coldchain/v1/devices/+/telemetry
 topic write coldchain/v1/devices/+/alert
 topic write coldchain/v1/devices/+/status
+topic write coldchain/v1/devices/+/ack
 topic read coldchain/v1/devices/+/command
 user tester
 topic write coldchain/v1/devices/+/telemetry
 topic read coldchain/v1/devices/+/status
 topic read coldchain/v1/devices/+/alert
+topic read coldchain/v1/devices/+/ack
 topic write coldchain/v1/devices/+/command

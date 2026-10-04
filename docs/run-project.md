@@ -21,15 +21,17 @@ Mở PowerShell tại thư mục gốc và chạy:
 ```powershell
 sqlcmd -S localhost -E -i database\schema.sql
 sqlcmd -S localhost -E -i database\seed.sql
+sqlcmd -S localhost -E -b -i database\migrations\20261004_alert_incidents.sql
 ```
 
 Nếu database đã tồn tại từ trước, chạy migration trạng thái cảnh báo một lần:
 
 ```powershell
 sqlcmd -S localhost -E -b -i database\migrations\20260930_alert_lifecycle.sql
+sqlcmd -S localhost -E -b -i database\migrations\20261004_alert_incidents.sql
 ```
 
-Sau khi khởi động lại Backend và tải lại Dashboard, mục **Cảnh báo** hiển thị cảnh báo đang mở. Bấm **Đã xử lý** để lưu `status = 'RESOLVED'`; chuyển sang tab **Đã xử lý** để xem lại lịch sử.
+Với database mới, chạy migration `20261004_alert_incidents.sql` sau `schema.sql` và `seed.sql` để tạo chỉ mục gộp sự cố. Migration giữ cảnh báo OPEN cũ nhất cho từng thiết bị/cảm biến/loại, chuyển các bản trùng cũ sang lịch sử Đã xử lý. Sau khi khởi động lại Backend và tải lại Dashboard, cảnh báo lặp chỉ cập nhật số lần ghi nhận. Khi điều kiện phục hồi, Backend tự ghi `recovered_at` và chuyển sang Đã xử lý. Nút **Đã xử lý** vẫn cho phép xử lý thủ công trước khi phục hồi.
 
 Lệnh trên dùng Windows Authentication. Nếu dùng SQL Login, thay `-E` bằng `-U <username> -P <password>`.
 
@@ -104,7 +106,7 @@ Mở địa chỉ Vite hiện trong terminal, thường là:
 http://localhost:5173
 ```
 
-Dashboard tự gọi Backend mỗi 5 giây.
+Dashboard nhận nhiệt độ mới qua `GET /api/live` ngay khi Backend nhận MQTT; dữ liệu lịch sử và trạng thái vẫn được tải lại mỗi 5 giây. Khi luồng trực tiếp mất kết nối, trình duyệt tự nối lại và polling vẫn tiếp tục.
 
 ## 6. Chuẩn bị firmware ESP32/Wokwi
 
@@ -173,6 +175,7 @@ coldchain/v1/devices/ESP32-01/telemetry
 coldchain/v1/devices/ESP32-01/alert
 coldchain/v1/devices/ESP32-01/status
 coldchain/v1/devices/ESP32-01/command
+coldchain/v1/devices/ESP32-01/ack
 ```
 
 Gửi cấu hình chuyến:
@@ -180,7 +183,7 @@ Gửi cấu hình chuyến:
 ```powershell
 mosquitto_pub -h 127.0.0.1 -p 1883 -u tester -P "<MAT_KHAU_TESTER>" `
   -t coldchain/v1/devices/ESP32-01/command `
-  -m '{"tripId":"TRIP001","tripState":"IN_TRANSIT","profileId":"VEGETABLE_CHILLED","Tmin":3.0,"Tmax":8.0,"earlyWarningMinutes":10,"maxDoorOpenSeconds":30,"deliveryMode":false}'
+  -m '{"commandId":"manual-001","tripId":"TRIP001","tripState":"IN_TRANSIT","profileId":"VEGETABLE_CHILLED","Tmin":3.0,"Tmax":8.0,"earlyWarningMinutes":10,"maxDoorOpenSeconds":30,"deliveryMode":false}'
 ```
 
 ## 9. Lệnh demo trong Serial Monitor
@@ -246,7 +249,7 @@ Backend subscribe topic MQTT `coldchain/v1/devices/+/status`. Khi broker phát L
 
 Dashboard có hai thao tác điều khiển:
 
-- **Delivery Mode**: gửi `deliveryMode: true/false` qua `POST /api/control/delivery-mode`, đồng thời cập nhật `trips.delivery_mode`.
-- **Quét QR giả lập / Bắt đầu chuyến**: nhập `Trip ID`, `Tmin`, `Tmax`, sau đó gửi `POST /api/control/start-trip`. Backend cập nhật chuyến sang `IN_TRANSIT` và publish lệnh MQTT cho ESP32.
+- **Delivery Mode**: gửi `deliveryMode: true/false` qua `POST /api/control/delivery-mode`. Backend chờ ACK `APPLIED` từ ESP32 rồi mới cập nhật `trips.delivery_mode` và báo thành công.
+- **Quét QR giả lập / Bắt đầu chuyến**: nhập `Trip ID`, `Tmin`, `Tmax`, sau đó gửi `POST /api/control/start-trip`. Backend chờ ACK cấu hình từ ESP32 rồi mới lưu chuyến `IN_TRANSIT`. Nếu hết 25 giây chưa có ACK, Dashboard báo trạng thái chưa xác định và giữ trạng thái hiện tại.
 
 MQTT phải kết nối trước khi bấm nút. Nếu chưa kết nối, dashboard sẽ hiển thị lỗi thay vì cập nhật trạng thái giả.

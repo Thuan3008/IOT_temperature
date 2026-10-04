@@ -42,7 +42,8 @@ async function listAlerts(tripId, status = "OPEN") {
   const pool = await poolPromise;
   const request = pool.request();
   let query = `SELECT TOP 500 alert_id, trip_id, device_id, sensor_id, packet_id,
-      alert_type, temperature, threshold_value, message, created_at, status, resolved_at
+      alert_type, temperature, threshold_value, message, created_at, last_seen_at,
+      occurrence_count, status, resolved_at, recovered_at
     FROM alerts`;
   const filters = [];
   if (tripId) {
@@ -54,7 +55,7 @@ async function listAlerts(tripId, status = "OPEN") {
     filters.push("status = @status");
   }
   if (filters.length) query += ` WHERE ${filters.join(" AND ")}`;
-  query += " ORDER BY created_at DESC, alert_id DESC";
+  query += " ORDER BY CASE WHEN status = 'OPEN' THEN last_seen_at ELSE COALESCE(recovered_at, resolved_at, created_at) END DESC, alert_id DESC";
   return (await request.query(query)).recordset;
 }
 
@@ -63,11 +64,11 @@ async function resolveAlert(alertId) {
   const result = await pool.request()
     .input("alertId", sql.BigInt, alertId)
     .query(`UPDATE alerts SET status = 'RESOLVED', resolved_at = SYSDATETIMEOFFSET()
-      OUTPUT INSERTED.alert_id, INSERTED.status, INSERTED.resolved_at
+      OUTPUT INSERTED.alert_id, INSERTED.status, INSERTED.resolved_at, INSERTED.recovered_at
       WHERE alert_id = @alertId AND status = 'OPEN'`);
   if (result.recordset[0]) return result.recordset[0];
   const existing = await pool.request().input("alertId", sql.BigInt, alertId)
-    .query("SELECT alert_id, status, resolved_at FROM alerts WHERE alert_id = @alertId");
+    .query("SELECT alert_id, status, resolved_at, recovered_at FROM alerts WHERE alert_id = @alertId");
   return existing.recordset[0] || null;
 }
 

@@ -64,6 +64,14 @@ function getReadings(payload) {
   return [];
 }
 
+function mergeLiveReadings(persisted, liveRows) {
+  const savedIds = new Set(persisted.map((row) => row.message_id).filter(Boolean));
+  return [
+    ...liveRows.filter((row) => !savedIds.has(row.message_id)),
+    ...persisted,
+  ].sort((a, b) => Date.parse(b.measured_at) - Date.parse(a.measured_at)).slice(0, 1000);
+}
+
 function getPacketGroups(readings) {
   const groups = new Map();
   for (const r of readings) {
@@ -629,7 +637,7 @@ function AlertPanel({ alerts, onResolve }) {
         </div>
         <div className="alert-tabs" role="tablist" aria-label="Trạng thái cảnh báo">
           <button type="button" role="tab" aria-selected={tab === "OPEN"} className={tab === "OPEN" ? "selected" : ""} onClick={() => setTab("OPEN")}>Đang mở</button>
-          <button type="button" role="tab" aria-selected={tab === "RESOLVED"} className={tab === "RESOLVED" ? "selected" : ""} onClick={() => setTab("RESOLVED")}>Đã xử lý</button>
+          <button type="button" role="tab" aria-selected={tab === "RESOLVED"} className={tab === "RESOLVED" ? "selected" : ""} onClick={() => setTab("RESOLVED")}>Đã xử lý / phục hồi</button>
         </div>
       </div>
       {actionError && <div className="alert-action-error" role="alert">{actionError}</div>}
@@ -642,11 +650,15 @@ function AlertPanel({ alerts, onResolve }) {
                   <strong>{alert.alert_type}</strong>
                   {alert.sensor_id && <span className="alert-sensor">{alert.sensor_id}</span>}
                   <span className={`alert-status ${alert.status === "OPEN" ? "open" : "resolved"}`}>
-                    {alert.status === "OPEN" ? "Đang mở" : "Đã xử lý"}
+                    {alert.status === "OPEN" ? "Đang mở" : alert.recovered_at ? "Đã phục hồi" : "Đã xử lý"}
                   </span>
                 </div>
                 <p>{alert.message || "Không có mô tả"}</p>
-                <small>#{alert.alert_id} · {formatTime(alert.created_at)}{alert.resolved_at ? ` · Xử lý ${formatTime(alert.resolved_at)}` : ""}</small>
+                <small>#{alert.alert_id} · Bắt đầu {formatTime(alert.created_at)}
+                  {alert.occurrence_count > 1 ? ` · ${alert.occurrence_count} lần ghi nhận` : ""}
+                  {alert.status === "OPEN" && alert.last_seen_at ? ` · Gần nhất ${formatTime(alert.last_seen_at)}` : ""}
+                  {alert.recovered_at ? ` · Phục hồi ${formatTime(alert.recovered_at)}` : alert.resolved_at ? ` · Xử lý ${formatTime(alert.resolved_at)}` : ""}
+                </small>
               </div>
               {alert.status === "OPEN" && (
                 <button type="button" className="alert-resolve-button" disabled={pendingId === alert.alert_id} onClick={() => handleResolve(alert.alert_id)}>
@@ -658,7 +670,7 @@ function AlertPanel({ alerts, onResolve }) {
         </div>
       ) : (
         <div className="empty-state" role="status">
-          <div className="empty-state-title">{tab === "OPEN" ? "Không có cảnh báo đang mở" : "Chưa có cảnh báo đã xử lý"}</div>
+          <div className="empty-state-title">{tab === "OPEN" ? "Không có cảnh báo đang mở" : "Chưa có cảnh báo đã xử lý hoặc phục hồi"}</div>
         </div>
       )}
     </section>
@@ -684,6 +696,8 @@ function App() {
   const [activeSection, setActiveSection] = useState("overview");
   const [isRefreshing,  setIsRefreshing]  = useState(false);
   const [driverMode,    setDriverMode]    = useState(false);
+  const [liveState,     setLiveState]     = useState(null);
+  const liveRowsRef = useRef([]);
 
   /* ── Data fetch ── */
   const refresh = useCallback(async (manual = false) => {
@@ -705,7 +719,7 @@ function App() {
       const [sensors, devices] = await Promise.all([sensorRes.json(), deviceRes.json()]);
 
       const next = getReadings(telData);
-      setReadings(next);
+      setReadings(mergeLiveReadings(next, liveRowsRef.current));
       setSensorStates(sensors);
       setDeviceStates(devices);
       setHealth(healthData.database === "SQL Server Connected" ? "online" : "offline");
@@ -739,6 +753,45 @@ function App() {
     }
   }, []);
 
+  // MQTT samples reach this stream before the slower SQL history write.
+  useEffect(() => {
+    const stream = new EventSource(`${API_BASE}/api/live`);
+    const onTelemetry = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (!Array.isArray(data.sensors) || data.isBuffered) return;
+        const messageId = data.messageId || `live-${Date.now()}`;
+        const packetId = `live:${messageId}`;
+        const rows = data.sensors.map((sensor) => ({
+          packet_id: packetId,
+          message_id: messageId,
+          device_id: data.deviceId,
+          trip_id: data.tripId,
+          door_status: data.door,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          measured_at: data.timestamp,
+          received_at: new Date().toISOString(),
+          is_buffered: false,
+          sensor_id: sensor.sensorId,
+          sensor_status: sensor.status,
+          temperature: sensor.temperature,
+          humidity: sensor.humidity,
+        }));
+        liveRowsRef.current = [
+          ...rows,
+          ...liveRowsRef.current.filter((row) => row.message_id !== messageId),
+        ].slice(0, 125);
+        setLiveState({ deviceId: data.deviceId, tripId: data.tripId, packetId, messageId, receivedAt: Date.now() });
+        setReadings((current) => mergeLiveReadings(current, liveRowsRef.current));
+      } catch (error) {
+        console.warn("Invalid live telemetry event:", error);
+      }
+    };
+    stream.addEventListener("telemetry", onTelemetry);
+    return () => { stream.removeEventListener("telemetry", onTelemetry); stream.close(); };
+  }, []);
+
   async function handleResolveAlert(alertId) {
     const response = await fetch(`${API_BASE}/api/alerts/${encodeURIComponent(alertId)}/resolve`, { method: "PATCH" });
     const result = await response.json();
@@ -757,28 +810,42 @@ function App() {
 
   /* ── Derived data ── */
   const packets = useMemo(() => getPacketGroups(readings), [readings]);
-  const latestPacket = packets[0];
+  // Wokwi's simulated clock can lag behind wall time. The packet that just
+  // arrived over SSE is the current physical reading even if an SQL row has
+  // a later measured_at timestamp.
+  const freshLivePacket = liveState && Date.now() - liveState.receivedAt < 15000
+    ? packets.find((packet) => packet.packet_id === liveState.packetId || packet.message_id === liveState.messageId)
+    : null;
+  const latestPacket = freshLivePacket || packets[0];
+  const displayPackets = freshLivePacket
+    ? [freshLivePacket, ...packets.filter((packet) => packet.packet_id !== freshLivePacket.packet_id)]
+    : packets;
 
   const tripId   = latestPacket?.trip_id   || "TRIP001";
   const deviceId = latestPacket?.device_id || "ESP32-01";
-  const deviceOffline = deviceStates.find((device) => device.device_id === deviceId)?.status !== "ONLINE";
+  const hasFreshLive = Boolean(freshLivePacket && liveState.deviceId === deviceId && liveState.tripId === tripId);
+  const deviceOffline = !hasFreshLive && deviceStates.find((device) => device.device_id === deviceId)?.status !== "ONLINE";
 
   const latestBySensor = useMemo(() => {
     const map = new Map();
+    if (hasFreshLive) {
+      for (const reading of freshLivePacket.sensors) map.set(reading.sensor_id, reading);
+    }
     for (const r of readings) {
       if (r.device_id === deviceId && r.trip_id === tripId && !map.has(r.sensor_id)) map.set(r.sensor_id, r);
     }
     for (const id of SENSOR_IDS) {
       const reading = map.get(id);
       const state = sensorStates.find((sensor) => sensor.device_id === deviceId && sensor.sensor_id === id);
-      const status = deviceOffline ? "OFFLINE" : (state?.status || "OFFLINE");
+      const status = deviceOffline ? "OFFLINE"
+        : hasFreshLive ? (reading?.sensor_status || "OFFLINE") : (state?.status || "OFFLINE");
       // SQL status phản ánh timeout/LWT mới nhất; không dùng số đo trong packet cũ.
       map.set(id, { ...reading, sensor_id: id, sensor_status: status,
         temperature: status === "ONLINE" ? reading?.temperature ?? null : null,
         humidity: status === "ONLINE" ? reading?.humidity ?? null : null });
     }
     return map;
-  }, [readings, sensorStates, deviceOffline, deviceId, tripId]);
+  }, [readings, sensorStates, deviceOffline, hasFreshLive, freshLivePacket, deviceId, tripId]);
 
   const outOfRange = useMemo(
     () =>
@@ -802,7 +869,9 @@ function App() {
     [packets, tripId, deviceId]
   );
 
-  const currentLocation = routeHistory.at(-1) || null;
+  const currentLocation = hasFreshLive && isValidLocation(latestPacket)
+    ? { latitude: latestPacket.latitude, longitude: latestPacket.longitude, timestamp: latestPacket.measured_at }
+    : routeHistory.at(-1) || null;
   const temperatures = [...latestBySensor.values()].map((r) => r.temperature).filter(Number.isFinite);
 
   /* ── Section navigation ── */
@@ -900,7 +969,7 @@ function App() {
                 </div>
                 <div className="live-badge">
                   <span className="live-dot" aria-hidden="true" />
-                  LIVE · 5 GIÂY
+                  LIVE · 4 GIÂY
                 </div>
               </div>
               <TrendChart packets={packets} limits={limits} />
@@ -923,7 +992,7 @@ function App() {
           <AlertPanel alerts={alerts} onResolve={handleResolveAlert} />
 
           {/* History table */}
-          <HistoryTable packets={packets} lastChecked={lastChecked} />
+          <HistoryTable packets={displayPackets} lastChecked={lastChecked} />
 
           {/* Map */}
           <section className="panel map-panel" id="trip-map" aria-label="Bản đồ hành trình">
@@ -953,7 +1022,7 @@ function App() {
           <footer className="page-footer">
             <span>Smart Cold Chain IoT</span>
             <span>·</span>
-            <span>Tự động làm mới mỗi 5 giây</span>
+            <span>Nhiệt độ trực tiếp · lịch sử đồng bộ mỗi 5 giây</span>
             <span>·</span>
             <span>API: {API_BASE}</span>
           </footer>

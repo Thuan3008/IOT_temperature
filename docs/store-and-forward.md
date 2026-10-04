@@ -1,6 +1,6 @@
 # ESP32 Store & Forward
 
-Firmware đọc năm DHT22 theo chu kỳ 10 giây. Nếu Wi-Fi hoặc MQTT không sẵn sàng, JSON telemetry được đưa vào Ring Buffer trong RAM tối đa 30 phần tử, ESP32 vẫn tiếp tục đọc cảm biến, kiểm tra cửa và phát cảnh báo cục bộ. Khi đầy, phần tử cũ nhất bị thay thế. Queue không bền vững qua reset/mất điện.
+Firmware đọc năm DHT22 theo chu kỳ 4 giây. Nếu Wi-Fi hoặc MQTT không sẵn sàng, JSON telemetry được đưa vào Ring Buffer trong RAM tối đa 30 phần tử (khoảng 2 phút), ESP32 vẫn tiếp tục đọc cảm biến, kiểm tra cửa và phát cảnh báo cục bộ. Khi đầy, phần tử cũ nhất bị thay thế. Queue không bền vững qua reset/mất điện.
 
 Khi MQTT kết nối lại, các gói đang chờ được phát lại theo thứ tự và đánh dấu `isBuffered: true`; sau khi phát hết queue mới gửi mẫu trực tiếp. Firmware dùng PubSubClient với QoS 0. `publish()` trả về true chỉ xác nhận việc publish được thư viện chấp nhận, không phải PUBACK hay xác nhận backend đã lưu. Không có bảo đảm giao hàng tuyệt đối.
 

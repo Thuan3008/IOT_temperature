@@ -8,11 +8,13 @@ const startMqtt = require("./mqttClient");
 const { startTimeoutMonitor } = require("./timeoutMonitor");
 const telemetryRoutes = require("./routes/telemetryRoutes");
 const controlRoutes = require("./routes/controlRoutes");
+const { streamTelemetry } = require("./liveTelemetry");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.get("/api/live", streamTelemetry);
 
 app.get("/", (req, res) => {
   res.json({

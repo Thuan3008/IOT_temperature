@@ -2,6 +2,7 @@ const sql = require("mssql");
 
 const poolPromise = require("./db");
 const { notifyTelegramAlerts } = require("./telegramNotifier");
+const { openIncident, recoverIncident } = require("./services/incidentService");
 
 const SENSOR_TIMEOUT_MS = Number(process.env.SENSOR_TIMEOUT_SECONDS || 30) * 1000;
 const DEVICE_TIMEOUT_MS = Number(process.env.DEVICE_TIMEOUT_SECONDS || 30) * 1000;
@@ -13,14 +14,10 @@ const offlineDevices = new Set();
 const offlineSensors = new Set();
 let scanRunning = false;
 
-async function recordTelemetrySeen(data) {
+function noteTelemetryArrival(data) {
   const now = Date.now();
   lastSeenDevices.set(data.deviceId, { at: now, tripId: data.tripId });
   offlineDevices.delete(data.deviceId);
-  const updates = [markDeviceOnline(data.deviceId).catch((error) => {
-    console.error(`Cannot update device last_seen: ${error.message}`);
-  })];
-
   for (const sensor of data.sensors) {
     const key = `${data.deviceId}:${sensor.sensorId}`;
     const hasValidReading = sensor.status === "ONLINE" && Number.isFinite(sensor.temperature);
@@ -31,14 +28,47 @@ async function recordTelemetrySeen(data) {
       // Cảm biến chưa từng ONLINE vẫn cần mốc bắt đầu để phát hiện 7B.
       lastSeenSensors.set(key, { at: now, tripId: data.tripId });
     }
+  }
+}
+
+async function recordTelemetrySeen(data) {
+  noteTelemetryArrival(data);
+  const pool = await poolPromise;
+  const request = pool.request().input("deviceId", sql.VarChar(50), data.deviceId);
+  const rows = [];
+  for (const [index, sensor] of data.sensors.entries()) {
+    const key = `${data.deviceId}:${sensor.sensorId}`;
+    const hasValidReading = sensor.status === "ONLINE" && Number.isFinite(sensor.temperature);
     // Khi đã timeout, gói FAULT tiếp theo không được ghi đè OFFLINE.
     const status = !hasValidReading && offlineSensors.has(key) ? "OFFLINE"
       : hasValidReading ? "ONLINE" : "FAULT";
-    updates.push(markSensorStatus(data.deviceId, sensor.sensorId, status, hasValidReading).catch((error) => {
-      console.error(`Cannot update sensor last_seen: ${error.message}`);
-    }));
+    request
+      .input(`sensorId${index}`, sql.VarChar(20), sensor.sensorId)
+      .input(`status${index}`, sql.VarChar(20), status)
+      .input(`valid${index}`, sql.Bit, hasValidReading);
+    rows.push(`(@sensorId${index}, @status${index}, @valid${index})`);
   }
-  await Promise.all(updates);
+  try {
+    await request.query(`
+      UPDATE devices SET status = 'ONLINE', last_seen = SYSDATETIMEOFFSET() WHERE device_id = @deviceId;
+      UPDATE s SET s.status = v.status,
+        s.last_seen = CASE WHEN v.valid = 1 THEN SYSDATETIMEOFFSET() ELSE s.last_seen END
+      FROM sensors s
+      INNER JOIN (VALUES ${rows.join(", ")}) AS v(sensor_id, status, valid)
+        ON s.sensor_id = v.sensor_id
+      WHERE s.device_id = @deviceId;
+      UPDATE a SET recovered_at = SYSDATETIMEOFFSET(), status = 'RESOLVED',
+        resolved_at = COALESCE(a.resolved_at, SYSDATETIMEOFFSET())
+      FROM alerts a
+      WHERE a.device_id = @deviceId AND a.recovered_at IS NULL
+        AND (a.alert_type = 'DEVICE_OFFLINE' OR
+          (a.alert_type = 'SENSOR_OFFLINE' AND EXISTS (
+            SELECT 1 FROM (VALUES ${rows.join(", ")}) AS v(sensor_id, status, valid)
+            WHERE v.sensor_id = a.sensor_id AND v.valid = 1)));
+    `);
+  } catch (error) {
+    console.error(`Cannot update device/sensor last_seen: ${error.message}`);
+  }
 }
 
 async function markDeviceOnline(deviceId) {
@@ -86,6 +116,7 @@ async function recordDeviceStatus(deviceId, status) {
       }
     }
     await markDeviceOnline(deviceId);
+    await recoverIncident({ deviceId, type: "DEVICE_OFFLINE" });
     console.log(`Device ${deviceId} ONLINE (MQTT status)`);
     return;
   }
@@ -99,17 +130,7 @@ async function recordDeviceStatus(deviceId, status) {
 }
 
 async function createTimeoutAlert({ deviceId, sensorId, tripId, type, message }) {
-  const pool = await poolPromise;
-  await pool.request()
-    .input("tripId", sql.VarChar(30), tripId)
-    .input("deviceId", sql.VarChar(50), deviceId)
-    .input("sensorId", sql.VarChar(20), sensorId || null)
-    .input("alertType", sql.VarChar(50), type)
-    .input("message", sql.NVarChar(500), message)
-    .query(`
-      INSERT INTO alerts (trip_id, device_id, sensor_id, packet_id, alert_type, temperature, threshold_value, message)
-      VALUES (@tripId, @deviceId, @sensorId, NULL, @alertType, NULL, NULL, @message)
-    `);
+  return openIncident({ tripId, deviceId, sensorId, type, message });
 }
 
 async function markDeviceOffline(deviceId, state, reason, wasOnline = true) {
@@ -127,12 +148,14 @@ async function markDeviceOffline(deviceId, state, reason, wasOnline = true) {
     }
     // Retained LWT có thể được phát lại khi backend restart; không tạo alert trùng.
     if (wasOnline && state.tripId) {
-      await createTimeoutAlert({ deviceId, tripId: state.tripId, type: "DEVICE_OFFLINE", message });
-      void notifyTelegramAlerts(
-        { deviceId, tripId: state.tripId, door: "UNKNOWN", latitude: null, longitude: null, timestamp: new Date().toISOString() },
-        [{ type: "DEVICE_OFFLINE", sensorId: null, temperature: null, threshold: null, message }]
-      );
-      console.warn(`DEVICE_OFFLINE: ${message}`);
+      const incident = await createTimeoutAlert({ deviceId, tripId: state.tripId, type: "DEVICE_OFFLINE", message });
+      if (incident.created) {
+        void notifyTelegramAlerts(
+          { deviceId, tripId: state.tripId, door: "UNKNOWN", latitude: null, longitude: null, timestamp: new Date().toISOString() },
+          [{ type: "DEVICE_OFFLINE", sensorId: null, temperature: null, threshold: null, message }]
+        );
+        console.warn(`DEVICE_OFFLINE: ${message}`);
+      }
     }
   } catch (error) {
     offlineDevices.delete(deviceId);
@@ -148,8 +171,8 @@ async function handleSensorTimeout(deviceId, sensorId, state, ageSeconds) {
     const message = `Cảm biến ${sensorId} của ${deviceId} không cập nhật trong ${ageSeconds} giây`;
     await markSensorStatus(deviceId, sensorId, "OFFLINE", false);
     if (state.tripId) {
-      await createTimeoutAlert({ deviceId, sensorId, tripId: state.tripId, type: "SENSOR_OFFLINE", message });
-      void notifyTelegramAlerts(
+      const incident = await createTimeoutAlert({ deviceId, sensorId, tripId: state.tripId, type: "SENSOR_OFFLINE", message });
+      if (incident.created) void notifyTelegramAlerts(
         { deviceId, tripId: state.tripId, door: "UNKNOWN", latitude: null, longitude: null, timestamp: new Date().toISOString() },
         [{ type: "SENSOR_OFFLINE", sensorId, temperature: null, threshold: null, message }]
       );
@@ -191,4 +214,4 @@ function startTimeoutMonitor() {
   return setInterval(() => { void scanTimeouts(); }, SCAN_INTERVAL_MS);
 }
 
-module.exports = { recordTelemetrySeen, recordDeviceStatus, startTimeoutMonitor, scanTimeouts };
+module.exports = { noteTelemetryArrival, recordTelemetrySeen, recordDeviceStatus, startTimeoutMonitor, scanTimeouts };

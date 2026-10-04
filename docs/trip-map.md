@@ -48,7 +48,7 @@ Icon xe tải dùng SVG nội tuyến trong `L.divIcon`, không cần tải ản
 
 ## Dữ liệu thật trên Dashboard
 
-`frontend/src/main.jsx` nhận telemetry API mỗi 5 giây. Packet được gộp từ các dòng
+`frontend/src/main.jsx` nhận mẫu trực tiếp qua `/api/live` và đồng bộ lịch sử từ telemetry API mỗi 5 giây. Packet được gộp từ các dòng
 sensor, rồi lọc theo cả trip_id và device_id. `routeHistory` sắp theo measured_at
 (không dùng received_at vì gói buffered có thể gửi bù). Điểm mới nhất có GPS hợp lệ
 là currentLocation. API GET /api/trips/:tripId bổ sung vehicle_plate từ bảng vehicles.

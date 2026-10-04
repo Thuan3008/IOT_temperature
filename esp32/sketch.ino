@@ -47,7 +47,7 @@ constexpr uint8_t GREEN_LED_PIN = 23;
 constexpr size_t SENSOR_COUNT = 5;
 constexpr size_t RING_CAPACITY = 30;
 constexpr size_t MAX_PAYLOAD_BYTES = 1200;
-constexpr uint32_t SAMPLE_INTERVAL_MS = 10000;
+constexpr uint32_t SAMPLE_INTERVAL_MS = 4000;
 constexpr uint32_t DEBOUNCE_MS = 45;
 constexpr uint32_t DOOR_HOLD_MS = 5000;
 constexpr uint32_t WIFI_RETRY_MS = 10000;
@@ -61,6 +61,7 @@ char telemetryTopic[100];
 char alertTopic[100];
 char statusTopic[100];
 char commandTopic[100];
+char ackTopic[100];
 char lwtPayload[128];
 
 DHTesp dht[SENSOR_COUNT];
@@ -130,6 +131,7 @@ void makeTopics() {
   snprintf(alertTopic, sizeof(alertTopic), "coldchain/v1/devices/%s/alert", DEVICE_ID_VALUE);
   snprintf(statusTopic, sizeof(statusTopic), "coldchain/v1/devices/%s/status", DEVICE_ID_VALUE);
   snprintf(commandTopic, sizeof(commandTopic), "coldchain/v1/devices/%s/command", DEVICE_ID_VALUE);
+  snprintf(ackTopic, sizeof(ackTopic), "coldchain/v1/devices/%s/ack", DEVICE_ID_VALUE);
   snprintf(lwtPayload, sizeof(lwtPayload), "{\"deviceId\":\"%s\",\"status\":\"OFFLINE\"}", DEVICE_ID_VALUE);
 }
 
@@ -212,6 +214,34 @@ void publishStatus(const char* status) {
   if (written > 0) mqtt.publish(statusTopic, payload, true);
 }
 
+void publishCommandAck(const char* commandId, const char* status, const char* reason = nullptr) {
+  if (!mqtt.connected() || !commandId || !commandId[0]) return;
+  JsonDocument ack;
+  ack["type"] = "COMMAND_ACK";
+  ack["commandId"] = commandId;
+  ack["deviceId"] = DEVICE_ID_VALUE;
+  ack["status"] = status;
+  if (reason) ack["reason"] = reason;
+  if (strcmp(status, "APPLIED") == 0) {
+    JsonObject applied = ack["applied"].to<JsonObject>();
+    applied["tripId"] = tripId;
+    applied["tripState"] = tripState;
+    applied["profileId"] = profileId;
+    applied["Tmin"] = minTemperature;
+    applied["Tmax"] = maxTemperature;
+    applied["earlyWarningMinutes"] = earlyWarningMinutes;
+    applied["maxDoorOpenSeconds"] = maxDoorOpenSeconds;
+    applied["deliveryMode"] = deliveryMode;
+  }
+  char payload[512];
+  const size_t written = serializeJson(ack, payload, sizeof(payload));
+  if (written == 0 || written >= sizeof(payload) || !mqtt.publish(ackTopic, payload)) {
+    Serial.println("Command ACK publish failed.");
+  } else {
+    Serial.printf("Command ACK %s id=%s\n", status, commandId);
+  }
+}
+
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   if (strcmp(topic, commandTopic) != 0) return;
   Serial.printf("MQTT command received (%u bytes).\n", length);
@@ -229,30 +259,50 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf("Command rejected: JSON error: %s\n", error.c_str());
     return;
   }
+  if (!doc["commandId"].is<const char*>()) {
+    Serial.println("Command rejected: missing commandId.");
+    return;
+  }
+  const char* commandId = doc["commandId"];
+  if (!commandId[0] || strlen(commandId) > 64) {
+    Serial.println("Command rejected: invalid commandId.");
+    return;
+  }
+  auto reject = [commandId](const char* reason) {
+    Serial.printf("Command rejected: %s\n", reason);
+    publishCommandAck(commandId, "REJECTED", reason);
+  };
   // Apply atomically after validating all supplied values.
-  if (doc["tripId"].is<const char*>()) {
+  if (!doc["tripId"].isUnbound()) {
+    if (!doc["tripId"].is<const char*>()) { reject("invalid tripId"); return; }
     const char* value = doc["tripId"];
-    if (strlen(value) == 0 || strlen(value) >= sizeof(tripId)) { Serial.println("Command rejected: invalid tripId."); return; }
+    if (strlen(value) == 0 || strlen(value) >= sizeof(tripId)) { reject("invalid tripId"); return; }
   }
-  if (doc["tripState"].is<const char*>()) {
+  if (!doc["tripState"].isUnbound()) {
+    if (!doc["tripState"].is<const char*>()) { reject("invalid tripState"); return; }
     const char* value = doc["tripState"];
-    if (strcmp(value, "IN_TRANSIT") && strcmp(value, "IDLE") && strcmp(value, "COMPLETED") && strcmp(value, "READY")) { Serial.println("Command rejected: invalid tripState."); return; }
+    if (strcmp(value, "IN_TRANSIT") && strcmp(value, "IDLE") && strcmp(value, "COMPLETED") && strcmp(value, "READY")) { reject("invalid tripState"); return; }
   }
-  if (doc["profileId"].is<const char*>()) {
+  if (!doc["profileId"].isUnbound()) {
+    if (!doc["profileId"].is<const char*>()) { reject("invalid profileId"); return; }
     const char* value = doc["profileId"];
-    if (strlen(value) == 0 || strlen(value) >= sizeof(profileId)) { Serial.println("Command rejected: invalid profileId."); return; }
+    if (strlen(value) == 0 || strlen(value) >= sizeof(profileId)) { reject("invalid profileId"); return; }
   }
   float newMin = minTemperature, newMax = maxTemperature;
+  if (!doc["Tmin"].isUnbound() && !doc["Tmin"].is<float>() && !doc["Tmin"].is<int>()) { reject("invalid Tmin"); return; }
+  if (!doc["Tmax"].isUnbound() && !doc["Tmax"].is<float>() && !doc["Tmax"].is<int>()) { reject("invalid Tmax"); return; }
   if (doc["Tmin"].is<float>() || doc["Tmin"].is<int>()) newMin = doc["Tmin"].as<float>();
   if (doc["Tmax"].is<float>() || doc["Tmax"].is<int>()) newMax = doc["Tmax"].as<float>();
-  if (!isfinite(newMin) || !isfinite(newMax) || newMin >= newMax || newMin < -40 || newMax > 80) { Serial.println("Command rejected: invalid Tmin/Tmax."); return; }
+  if (!isfinite(newMin) || !isfinite(newMax) || newMin >= newMax || newMin < -40 || newMax > 80) { reject("invalid Tmin/Tmax"); return; }
   uint32_t newDoorLimit = maxDoorOpenSeconds;
+  if (!doc["maxDoorOpenSeconds"].isUnbound() && !doc["maxDoorOpenSeconds"].is<uint32_t>()) { reject("invalid maxDoorOpenSeconds"); return; }
   if (doc["maxDoorOpenSeconds"].is<uint32_t>()) newDoorLimit = doc["maxDoorOpenSeconds"].as<uint32_t>();
-  if (newDoorLimit < 1 || newDoorLimit > 86400) { Serial.println("Command rejected: maxDoorOpenSeconds out of range."); return; }
+  if (newDoorLimit < 1 || newDoorLimit > 86400) { reject("maxDoorOpenSeconds out of range"); return; }
   uint16_t newEarlyWarning = earlyWarningMinutes;
+  if (!doc["earlyWarningMinutes"].isUnbound() && !doc["earlyWarningMinutes"].is<uint16_t>()) { reject("invalid earlyWarningMinutes"); return; }
   if (doc["earlyWarningMinutes"].is<uint16_t>()) newEarlyWarning = doc["earlyWarningMinutes"].as<uint16_t>();
-  if (newEarlyWarning > 1440) { Serial.println("Command rejected: earlyWarningMinutes out of range."); return; }
-  if (doc["deliveryMode"].is<bool>() == false && !doc["deliveryMode"].isUnbound()) { Serial.println("Command rejected: deliveryMode must be boolean."); return; }
+  if (newEarlyWarning > 1440) { reject("earlyWarningMinutes out of range"); return; }
+  if (doc["deliveryMode"].is<bool>() == false && !doc["deliveryMode"].isUnbound()) { reject("deliveryMode must be boolean"); return; }
 
   minTemperature = newMin;
   maxTemperature = newMax;
@@ -264,6 +314,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   if (doc["profileId"].is<const char*>()) strlcpy(profileId, doc["profileId"], sizeof(profileId));
   Serial.printf("Config applied: trip=%s state=%s profile=%s Tmin=%.1f Tmax=%.1f deliveryMode=%s maxDoor=%lus\n",
     tripId, tripState, profileId, minTemperature, maxTemperature, deliveryMode ? "ON" : "OFF", static_cast<unsigned long>(maxDoorOpenSeconds));
+  publishCommandAck(commandId, "APPLIED");
   checkLocalAlerts();
 }
 
@@ -574,7 +625,7 @@ void setup() {
   setupWiFi();
   Serial.printf("Booted %s. Sampling every %lu ms.\n", DEVICE_ID_VALUE, static_cast<unsigned long>(SAMPLE_INTERVAL_MS));
   Serial.println("GPS positions are simulated HCMC route coordinates.");
-  Serial.printf("Topics: %s | %s | %s | %s\n", telemetryTopic, alertTopic, statusTopic, commandTopic);
+  Serial.printf("Topics: %s | %s | %s | %s | %s\n", telemetryTopic, alertTopic, statusTopic, commandTopic, ackTopic);
 }
 
 void loop() {

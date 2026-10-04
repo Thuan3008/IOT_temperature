@@ -48,7 +48,8 @@ export default function ControlPanel({ deviceId, tripId, deliveryMode, setDelive
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Thao tác không thành công");
-      setFeedback({ error: false, text: result.message || "Đã lưu cấu hình và gửi lệnh. Kiểm tra log ESP32 để xác nhận áp dụng." });
+      if (!result.acknowledged) throw new Error("Chưa nhận được ACK từ ESP32; trạng thái chưa xác định.");
+      setFeedback({ error: false, text: result.message || "ESP32 đã xác nhận áp dụng lệnh." });
       return result;
     } catch (error) { setFeedback({ error: true, text: error.message }); return null; }
     finally { setBusy(false); }
@@ -80,7 +81,7 @@ export default function ControlPanel({ deviceId, tripId, deliveryMode, setDelive
     <div className="panel-header"><div className="panel-title-group"><div className="panel-eyebrow">Điều khiển nghiệp vụ · Demo</div><div className="panel-title">Control Panel</div></div><span className={`delivery-badge ${deliveryMode ? "on" : "off"}`}>DELIVERY {deliveryMode ? "ON" : "OFF"}</span></div>
     <div className="delivery-mode-section">
       <div className="delivery-info"><div className="delivery-title">{deliveryMode ? "Đang giao hàng" : "Đang vận chuyển"}</div><div className="delivery-sub">{deliveryMode ? "Mở cửa giao hàng hợp lệ. Cảnh báo nhiệt độ và mở cửa quá lâu vẫn hoạt động." : "Trong chuyến đang chạy, mở cửa sẽ kích hoạt cảnh báo vi phạm."}</div></div>
-      <button className={`btn ${deliveryMode ? "btn-secondary" : "btn-primary"}`} type="button" onClick={toggleDelivery} disabled={busy}>{deliveryMode ? "Kết thúc giao hàng" : "Bắt đầu giao hàng"}</button>
+      <button className={`btn ${deliveryMode ? "btn-secondary" : "btn-primary"}`} type="button" onClick={toggleDelivery} disabled={busy}>{busy ? "Đang chờ ESP32 xác nhận…" : deliveryMode ? "Kết thúc giao hàng" : "Bắt đầu giao hàng"}</button>
     </div>
     <div className="trip-form-section"><div className="trip-form-title"><span>Lô hàng & Storage Profile</span><button className="btn btn-primary" type="button" onClick={openTrip} disabled={busy}>▣ Khởi tạo chuyến</button></div><p className="business-hint">Chọn lô hàng và profile, điều chỉnh ngưỡng trước khi xuất phát. Thiết bị: {deviceId}.</p></div>
     {notice}
@@ -102,7 +103,7 @@ export default function ControlPanel({ deviceId, tripId, deliveryMode, setDelive
         </div>
         <p className="business-hint">Có thể chỉnh tay ngưỡng cho chuyến này. Chuyến bắt đầu với Delivery Mode OFF.</p>
         {notice}
-        <div className="business-dialog-actions"><button className="btn btn-secondary" type="button" onClick={() => dialog.current.close()} disabled={busy}>Hủy</button><button className="btn btn-primary" type="submit" disabled={busy || !options.profiles.length}>{busy ? "Đang gửi…" : "▶ Bắt đầu chuyến"}</button></div>
+        <div className="business-dialog-actions"><button className="btn btn-secondary" type="button" onClick={() => dialog.current.close()} disabled={busy}>Hủy</button><button className="btn btn-primary" type="submit" disabled={busy || !options.profiles.length}>{busy ? "Đang chờ ESP32 xác nhận…" : "▶ Bắt đầu chuyến"}</button></div>
       </form>}
     </dialog>
   </section>;

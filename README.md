@@ -31,6 +31,7 @@ Mở URL Vite hiển thị trong terminal (thường là `http://localhost:5173`
 ```powershell
 sqlcmd -S localhost -E -i database/schema.sql
 sqlcmd -S localhost -E -i database/seed.sql
+sqlcmd -S localhost -E -b -i database/migrations/20261004_alert_incidents.sql
 ```
 
 Nếu dùng SQL login, thay `-E` bằng `-U <user> -P <password>`. Kiểm tra `http://localhost:3000/` và `http://localhost:3000/api/health`.
@@ -120,6 +121,6 @@ Topic/command contract xem [docs/mqtt-topics.md](docs/mqtt-topics.md); toàn b�
 - Lệnh demo cửa/lỗi cảm biến/mất Wi‑Fi xem tại [wokwi-demo.md](E:/HK7/IOT/DACK_V1/IOT_temperature/docs/wokwi-demo.md).
   Để xem MQTT trực tiếp, mở thêm terminal và subscribe:
   mosquitto_sub -h 127.0.0.1 -p 1883 -u tester -P "<mật-khẩu-tester>" -t "coldchain/v1/devices/ESP32-01/#" -v
-  Để gửi cấu hình từ MQTT, dùng mosquitto_pub lên topic coldchain/v1/devices/ESP32-01/command; ví dụ JSON có sẵn trong hướng dẫn demo. Dashboard hiện chủ yếu hiển thị dữ liệu, chưa có giao diện gửi command.
+  Dashboard có Control Panel để gửi Delivery Mode và cấu hình chuyến. Backend chờ ACK từ ESP32 trước khi báo đã áp dụng; ví dụ lệnh MQTT thủ công có trong hướng dẫn demo.
 & "C:\Users\thuan\.platformio\penv\Scripts\platformio.exe" run -e wokwi
 
