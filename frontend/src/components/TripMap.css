@@ -1,80 +1,608 @@
 /* ============================================================
-   TripMap Component Styles
-   (Overrides + extras not covered by global style.css)
+   TripMap Component Styles — Dynamic OSRM Route Dispatcher UI
    ============================================================ */
 
-.trip-map-panel { margin-bottom: 20px; }
+.trip-map-panel {
+  margin-bottom: 24px;
+}
 
 .trip-map-wrapper {
   position: relative;
   overflow: hidden;
   border-radius: 0 0 var(--radius-lg, 14px) var(--radius-lg, 14px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  background: #f8fafc;
 }
 
-/* Ensure Leaflet tiles never clip */
 .trip-map-wrapper .leaflet-container img {
   max-width: none !important;
 }
 
-/* Truck marker pin */
-.trip-truck-icon  { background: none; border: 0; }
-.trip-truck-pin {
-  width: 46px;
-  height: 46px;
-  border: 3px solid white;
-  border-radius: 50% 50% 50% 4px;
-  background: #0d9488;
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.5);
-  transform: rotate(-45deg);
-  display: grid;
-  place-items: center;
-  color: white;
-}
-.trip-truck-pin svg {
-  width: 30px;
-  height: 30px;
-  transform: rotate(45deg);
+.trip-map-canvas {
+  height: 480px;
+  width: 100%;
+  z-index: 10;
 }
 
-/* Popup */
-.trip-map-popup {
-  min-width: 220px;
-  font-family: 'Inter', sans-serif;
-  color: #0f172a;
+.trip-map-canvas.map-crosshair {
+  cursor: crosshair !important;
 }
-.trip-map-popup > strong {
-  display: block;
-  font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: #0f172a;
-}
-.trip-map-popup dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 7px 14px;
-  font-size: 12px;
-  margin: 0;
-}
-.trip-map-popup dt { color: #64748b; }
-.trip-map-popup dd { margin: 0; text-align: right; font-weight: 500; }
 
-/* No-GPS placeholder */
-.trip-map-placeholder {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+/* ══════════════════════════════════════════════════════════════
+   ROUTE DISPATCHER TOOLBAR (GIAO DIỆN CHỌN ĐIỂM ĐI & ĐIỂM ĐẾN)
+   ══════════════════════════════════════════════════════════════ */
+.route-dispatcher-bar {
   background: white;
-  padding: 8px 13px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.route-selector-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ── Mode Pill Toggle (Live vs Custom) ── */
+.mode-pill-toggle {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 3px;
   border-radius: 8px;
-  font-size: 11px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-  z-index: 500;
-  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.mode-pill-toggle .pill-btn {
+  border: none;
+  background: none;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mode-pill-toggle .pill-btn.active {
+  background: white;
+  color: #0f172a;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Dropdown Chọn Kho & Điểm Giao ── */
+.hub-select-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 8px;
+  transition: border-color 0.2s;
+}
+
+.hub-select-group:focus-within {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+}
+
+.hub-icon {
+  font-size: 14px;
+}
+
+.hub-select {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.route-arrow {
+  color: #94a3b8;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* ── Nút Bấm Chọn Trên Bản Đồ ── */
+.btn-pick-map {
+  background: white;
+  border: 1.5px dashed #0d9488;
+  color: #0d9488;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-pick-map:hover {
+  background: #f0fdfa;
+}
+
+.btn-pick-map.picking {
+  background: #0d9488;
+  color: white;
+  border-style: solid;
+  animation: pulse-ring 1.5s infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(13, 148, 136, 0); }
+}
+
+/* ── Hàng Điều Khiển Mô Phỏng (Simulation Row) ── */
+.simulation-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.route-meta-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #334155;
+  background: #f1f5f9;
+  padding: 6px 12px;
+  border-radius: 6px;
   border: 1px solid #e2e8f0;
 }
 
-@media (max-width: 680px) {
-  .trip-map-wrapper .trip-map-canvas { height: 320px; }
-  .trip-map-popup { min-width: 180px; }
+.meta-sep {
+  color: #cbd5e1;
+}
+
+.routing-spinner {
+  font-size: 11px;
+  color: #0d9488;
+  font-weight: 700;
+  animation: blink-dot 1s infinite;
+}
+
+/* ── Nút Chạy / Tạm dừng / Tốc độ ── */
+.sim-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-sim-play {
+  background: #0d9488;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3);
+}
+
+.btn-sim-play:hover {
+  background: #0f766e;
+}
+
+.btn-sim-play.pause {
+  background: #d97706;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+}
+
+.btn-sim-reset,
+.btn-fit-bounds {
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-sim-reset:hover,
+.btn-fit-bounds:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* ── Nút Zoom In / Zoom Out trên thanh công cụ ── */
+.zoom-toggle {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.btn-zoom-action {
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-zoom-action:hover {
+  background: #f1f5f9;
+  border-color: #0d9488;
+  color: #0d9488;
+}
+
+/* ── Tinh chỉnh nút Zoom Controls của Leaflet ── */
+.trip-map-wrapper .leaflet-top.leaflet-right {
+  top: 14px;
+  right: 14px;
+}
+
+.trip-map-wrapper .leaflet-control-zoom {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+}
+
+.trip-map-wrapper .leaflet-control-zoom a {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  width: 34px !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  font-size: 17px !important;
+  transition: all 0.18s ease !important;
+}
+
+.trip-map-wrapper .leaflet-control-zoom a:hover {
+  background-color: #0d9488 !important;
+  color: #ffffff !important;
+}
+
+.speed-toggle {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.btn-spd {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-spd.active {
+  background: white;
+  color: #0d9488;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Banner hướng dẫn bấm chọn trên bản đồ ── */
+.pick-mode-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: #0f2830;
+  color: #5eead4;
+  padding: 9px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1.5px solid rgba(94, 234, 212, 0.4);
+  animation: slide-down 0.3s ease;
+}
+
+.pick-mode-banner button {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LEAFLET MARKER PINS & DYNAMIC ROTATING TRUCK
+   ══════════════════════════════════════════════════════════════ */
+.map-depot-marker {
+  background: none;
+  border: none;
+}
+
+.map-depot-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border: 2px solid white;
+  transition: transform 0.2s ease;
+  user-select: none;
+}
+
+.map-depot-pin:hover {
+  transform: scale(1.08);
+}
+
+.map-pin-start {
+  background: linear-gradient(135deg, #059669, #10b981);
+}
+
+.map-pin-delivery {
+  background: linear-gradient(135deg, #e11d48, #f43f5e);
+}
+
+.map-pin-icon { font-size: 14px; line-height: 1; }
+.map-pin-text { letter-spacing: 0.02em; }
+
+/* ── Xe tải có xoay đầu và nhãn trực tiếp ── */
+.trip-truck-icon-container {
+  background: none;
+  border: none;
+}
+
+.trip-truck-marker-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 140px;
+}
+
+.truck-live-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', 'Inter', monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: white;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  border: 1.5px solid white;
+  margin-bottom: 3px;
+  transition: background 0.3s ease;
+}
+
+.truck-live-status-pill.running {
+  background: #059669;
+}
+
+.truck-live-status-pill.stopped {
+  background: #dc2626;
+  animation: pulse-border 1.2s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0); }
+}
+
+.truck-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.truck-status-dot.running {
+  background: #34d399;
+  animation: pulse-dot 1.5s infinite;
+}
+
+.truck-status-dot.stopped {
+  background: #fca5a5;
+  animation: blink-dot 0.7s step-start infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+@keyframes blink-dot {
+  50% { opacity: 0; }
+}
+
+.trip-truck-pin-outer {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Khung xe tải xoay theo hướng di chuyển */
+.trip-truck-pin {
+  width: 44px;
+  height: 44px;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 4px;
+  background: #0d9488;
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.55);
+  display: grid;
+  place-items: center;
+  color: white;
+  transition: transform 0.4s ease, background 0.3s;
+}
+
+.trip-truck-marker-wrap.stopped .trip-truck-pin {
+  background: #dc2626;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.55);
+}
+
+.trip-truck-pin svg {
+  width: 28px;
+  height: 28px;
+  transform: rotate(45deg);
+}
+
+/* ── Popup Details ── */
+.trip-map-popup {
+  min-width: 230px;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #0f172a;
+}
+
+.trip-map-popup strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.trip-map-popup .popup-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0d9488;
+  margin-bottom: 2px;
+}
+
+.trip-map-popup .popup-address {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.trip-map-popup dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 11.5px;
+  margin: 0;
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.trip-map-popup dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.trip-map-popup dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.popup-status-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.popup-status-badge.running {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.popup-status-badge.stopped {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ── Map Legend Overlay ── */
+.map-legend-overlay {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 500;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.map-legend-overlay .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-legend-overlay .legend-icon {
+  font-size: 13px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.legend-line.actual {
+  background: #0d9488;
+}
+
+.legend-line.planned {
+  background: #94a3b8;
+  border-top: 2px dashed #64748b;
+  height: 0;
+}
+
+@media (max-width: 768px) {
+  .route-dispatcher-bar { padding: 10px; }
+  .hub-select { max-width: 160px; }
+  .trip-map-canvas { height: 360px; }
+  .map-legend-overlay { display: none; }
 }

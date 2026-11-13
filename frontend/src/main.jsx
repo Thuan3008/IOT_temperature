@@ -18,7 +18,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import TripMap, { isValidLocation } from "./components/TripMap";
+import TripMap, {
+  isValidLocation,
+  LOGISTICS_HUBS,
+  PLANNED_ROUTE,
+  calculateBearing,
+} from "./components/TripMap";
 import DriverView from "./components/DriverView";
 import ControlPanel from "./components/ControlPanel";
 import "./style.css";
@@ -103,15 +108,42 @@ const TRIP_STATE_LABELS = {
 };
 
 /* ════════════════════════════════════════════════════════════════
-   SIDEBAR
+   SIDEBAR & NAVIGATION
    ════════════════════════════════════════════════════════════════ */
 
-function Sidebar({ health, activeSection, onNavigate }) {
+const SECTION_METAS = {
+  overview: {
+    label: "Smart Cold Chain / Tổng quan",
+    title: "Tổng quan giám sát vận chuyển",
+  },
+  controls: {
+    label: "Smart Cold Chain / Điều khiển",
+    title: "Bảng điều khiển & Cài đặt hành trình",
+  },
+  sensors: {
+    label: "Smart Cold Chain / Cảm biến",
+    title: "Giám sát chi tiết 5 cảm biến DHT22",
+  },
+  alerts: {
+    label: "Smart Cold Chain / Cảnh báo",
+    title: "Trung tâm quản lý cảnh báo & Sự cố",
+  },
+  history: {
+    label: "Smart Cold Chain / Lịch sử",
+    title: "Lịch sử dữ liệu Telemetry & Bộ đệm",
+  },
+  "trip-map": {
+    label: "Smart Cold Chain / Bản đồ GPS",
+    title: "Bản đồ lộ trình & Định vị xe trực tiếp",
+  },
+};
+
+function Sidebar({ health, activeSection, onNavigate, openAlertsCount = 0 }) {
   const navItems = [
     { id: "overview",  label: "Tổng quan",     icon: "⊞" },
     { id: "controls",  label: "Điều khiển",    icon: "⚙" },
     { id: "sensors",   label: "Cảm biến",      icon: "◉" },
-    { id: "alerts",    label: "Cảnh báo",      icon: "⚠" },
+    { id: "alerts",    label: "Cảnh báo",      icon: "⚠", badge: openAlertsCount },
     { id: "history",   label: "Lịch sử",       icon: "⊙" },
     { id: "trip-map",  label: "Bản đồ GPS",    icon: "⊕" },
   ];
@@ -138,7 +170,7 @@ function Sidebar({ health, activeSection, onNavigate }) {
       {/* Navigation */}
       <nav className="sidebar-nav">
         <div className="nav-section-label">Giám sát</div>
-        {navItems.map(({ id, label, icon }) => (
+        {navItems.map(({ id, label, icon, badge }) => (
           <button
             key={id}
             className={`nav-item${activeSection === id ? " active" : ""}`}
@@ -146,7 +178,8 @@ function Sidebar({ health, activeSection, onNavigate }) {
             aria-current={activeSection === id ? "page" : undefined}
           >
             <span className="nav-icon" aria-hidden="true">{icon}</span>
-            {label}
+            <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
+            {Boolean(badge) && <span className="nav-badge">{badge}</span>}
           </button>
         ))}
       </nav>
@@ -166,7 +199,8 @@ function Sidebar({ health, activeSection, onNavigate }) {
    TOP BAR
    ════════════════════════════════════════════════════════════════ */
 
-function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode }) {
+function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode, activeSection }) {
+  const meta = SECTION_METAS[activeSection] || SECTION_METAS.overview;
   const badgeLabel = {
     online:   "Đang hoạt động",
     offline:  "Mất kết nối",
@@ -176,8 +210,8 @@ function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode }) 
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <div className="page-label">Smart Cold Chain / Dashboard</div>
-        <h1 className="page-title">Giám sát vận chuyển lạnh</h1>
+        <div className="page-label">{meta.label}</div>
+        <h1 className="page-title">{meta.title}</h1>
       </div>
 
       <div className="topbar-right">
@@ -527,13 +561,15 @@ function SensorList({ latestBySensor, limits }) {
    HISTORY TABLE
    ════════════════════════════════════════════════════════════════ */
 
-function HistoryTable({ packets, lastChecked }) {
+function HistoryTable({ packets, lastChecked, limit = 50 }) {
   return (
     <section className="panel history-panel" id="history" aria-label="Lịch sử bản tin telemetry">
       <div className="panel-header">
         <div className="panel-title-group">
           <div className="panel-eyebrow">Telemetry MQTT</div>
-          <div className="panel-title">Bản tin gần đây</div>
+          <div className="panel-title">
+            Bản tin telemetry ({packets.length ? `${Math.min(packets.length, limit)} / ${packets.length}` : "0"})
+          </div>
         </div>
         <span className="updated-at-label">
           {lastChecked ? `Đồng bộ ${formatTimeShort(lastChecked)}` : "Đang đồng bộ…"}
@@ -555,7 +591,7 @@ function HistoryTable({ packets, lastChecked }) {
               </tr>
             </thead>
             <tbody>
-              {packets.slice(0, 15).map((p) => (
+              {packets.slice(0, limit).map((p) => (
                 <tr key={p.packet_id}>
                   <td>
                     <span className="packet-id">#{p.packet_id}</span>
@@ -678,6 +714,419 @@ function AlertPanel({ alerts, onResolve }) {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   PAGE VIEWS (TỪNG TRANG RIÊNG BIỆT)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Trang Tổng quan ── */
+function OverviewView({
+  tripId,
+  deviceId,
+  tripState,
+  limits,
+  vehiclePlate,
+  latestPacket,
+  packets,
+  latestBySensor,
+  outOfRange,
+  currentLocation,
+  alerts,
+  onNavigate,
+}) {
+  const openAlerts = alerts.filter((a) => a.status === "OPEN");
+
+  return (
+    <div className="page-view overview-view">
+      <TripBanner
+        tripId={tripId}
+        deviceId={deviceId}
+        tripState={tripState}
+        limits={limits}
+        vehiclePlate={vehiclePlate}
+      />
+
+      <KpiGrid
+        latestPacket={latestPacket}
+        packets={packets}
+        latestBySensor={latestBySensor}
+        limits={limits}
+        outOfRange={outOfRange}
+      />
+
+      <div className="content-grid">
+        <article className="panel" id="chart-panel" aria-label="Biểu đồ nhiệt độ">
+          <div className="panel-header">
+            <div className="panel-title-group">
+              <div className="panel-eyebrow">Nhiệt độ theo thời gian</div>
+              <div className="panel-title">Diễn biến nhiệt độ</div>
+            </div>
+            <div className="live-badge">
+              <span className="live-dot" aria-hidden="true" />
+              LIVE · 4 GIÂY
+            </div>
+          </div>
+          <TrendChart packets={packets} limits={limits} />
+        </article>
+
+        <article className="panel" id="sensors-panel" aria-label="Danh sách cảm biến">
+          <div className="panel-header">
+            <div className="panel-title-group">
+              <div className="panel-eyebrow">Thiết bị ESP32</div>
+              <div className="panel-title">Cảm biến</div>
+            </div>
+            <span className="sensor-count-badge">
+              {[...latestBySensor.values()].filter((r) => r.sensor_status === "ONLINE").length}/5 online
+            </span>
+          </div>
+          <SensorList latestBySensor={latestBySensor} limits={limits} />
+        </article>
+      </div>
+
+      <div className="quick-cards-grid">
+        <div className="quick-card">
+          <div>
+            <div className="quick-card-header">
+              <span className="quick-card-title">📍 Vị trí & Lộ trình xe</span>
+              <span className="badge-dot" style={{ background: "var(--color-primary)" }} />
+            </div>
+            <div className="quick-card-body" style={{ marginTop: 8 }}>
+              {currentLocation ? (
+                <>
+                  <div>Tọa độ hiện tại: <strong>{Number(currentLocation.latitude).toFixed(4)}, {Number(currentLocation.longitude).toFixed(4)}</strong></div>
+                  <div className="quick-card-meta">
+                    <span>Trạng thái: <strong>{currentLocation.vehicleStatus || "Đang chạy"}</strong></span>
+                    <span>·</span>
+                    <span>Cập nhật: {formatTimeShort(currentLocation.timestamp)}</span>
+                  </div>
+                </>
+              ) : (
+                <div>Đang kết nối GPS hoặc xe đang ở điểm xuất phát...</div>
+              )}
+            </div>
+          </div>
+          <button className="quick-card-btn" onClick={() => onNavigate("trip-map")}>
+            Mở bản đồ GPS chi tiết →
+          </button>
+        </div>
+
+        <div className="quick-card">
+          <div>
+            <div className="quick-card-header">
+              <span className="quick-card-title">⚠️ Trạng thái cảnh báo</span>
+              <span className={`badge-dot ${openAlerts.length > 0 ? "offline" : "online"}`} />
+            </div>
+            <div className="quick-card-body" style={{ marginTop: 8 }}>
+              {openAlerts.length > 0 ? (
+                <div style={{ color: "var(--color-danger)", fontWeight: 600 }}>
+                  Có {openAlerts.length} cảnh báo đang mở cần kiểm tra ngay!
+                </div>
+              ) : (
+                <div style={{ color: "var(--color-success)", fontWeight: 600 }}>
+                  ✓ Toàn bộ cảm biến và cửa khoang nằm trong giới hạn an toàn.
+                </div>
+              )}
+              <div className="quick-card-meta">
+                <span>Tổng sự cố ghi nhận: {alerts.length}</span>
+              </div>
+            </div>
+          </div>
+          <button className="quick-card-btn" onClick={() => onNavigate("alerts")}>
+            Quản lý cảnh báo →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 2. Trang Điều khiển ── */
+function ControlsView({
+  deviceId,
+  tripId,
+  deliveryMode,
+  setDeliveryMode,
+  limits,
+  tripState,
+  setTripState,
+  setLimits,
+  vehiclePlate,
+  health,
+  latestPacket,
+}) {
+  return (
+    <div className="page-view controls-view">
+      <TripBanner
+        tripId={tripId}
+        deviceId={deviceId}
+        tripState={tripState}
+        limits={limits}
+        vehiclePlate={vehiclePlate}
+      />
+
+      <ControlPanel
+        deviceId={deviceId}
+        tripId={tripId}
+        deliveryMode={deliveryMode}
+        setDeliveryMode={setDeliveryMode}
+        limits={limits}
+        onStarted={(result) => {
+          if (result.tripState) setTripState(result.tripState);
+          if (result.Tmin != null || result.Tmax != null)
+            setLimits({ min: result.Tmin, max: result.Tmax });
+        }}
+      />
+
+      <div className="device-info-panel">
+        <div className="panel-title-group">
+          <div className="panel-eyebrow">Phần cứng & Hạ tầng IoT</div>
+          <div className="panel-title">Thông số kết nối & Cấu hình thiết bị</div>
+        </div>
+        <div className="device-info-grid">
+          <div className="device-info-item">
+            <div className="device-info-label">Thiết bị IoT</div>
+            <div className="device-info-value">{deviceId} (ESP32-WROOM)</div>
+          </div>
+          <div className="device-info-item">
+            <div className="device-info-label">Mạng & Kết nối</div>
+            <div className="device-info-value">{health === "online" ? "MQTT / WiFi Connected" : "Mất kết nối"}</div>
+          </div>
+          <div className="device-info-item">
+            <div className="device-info-label">Biển số xe</div>
+            <div className="device-info-value">{vehiclePlate || "Chưa gán biển số"}</div>
+          </div>
+          <div className="device-info-item">
+            <div className="device-info-label">Cửa khoang hiện tại</div>
+            <div className="device-info-value">{latestPacket?.door_status || "CLOSED"}</div>
+          </div>
+          <div className="device-info-item">
+            <div className="device-info-label">Cơ chế đệm ngoại tuyến</div>
+            <div className="device-info-value">Flash Ring Buffer (Tự động lưu khi mất mạng)</div>
+          </div>
+          <div className="device-info-item">
+            <div className="device-info-label">Chu kỳ phát telemetry</div>
+            <div className="device-info-value">4.0 giây / bản tin</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 3. Trang Cảm biến ── */
+function SensorsView({
+  latestBySensor,
+  limits,
+  packets,
+  outOfRange,
+}) {
+  const onlineCount = [...latestBySensor.values()].filter(
+    (r) => r.sensor_status === "ONLINE"
+  ).length;
+
+  const temps = [...latestBySensor.values()].map((r) => r.temperature).filter(Number.isFinite);
+  const hums = [...latestBySensor.values()].map((r) => r.humidity).filter(Number.isFinite);
+  const maxTemp = temps.length ? Math.max(...temps) : null;
+  const minTemp = temps.length ? Math.min(...temps) : null;
+  const avgHum = hums.length ? Math.round(hums.reduce((a, b) => a + b, 0) / hums.length) : null;
+
+  return (
+    <div className="page-view sensors-view">
+      <div className="stats-summary-bar">
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Cảm biến Online</div>
+          <div className="stats-summary-num" style={{ color: onlineCount === 5 ? "#15803d" : "#d97706" }}>
+            {onlineCount}/5
+          </div>
+        </div>
+        <div className={`stats-summary-card ${outOfRange > 0 ? "alert-highlight" : ""}`}>
+          <div className="stats-summary-label">Ngoài ngưỡng nhiệt</div>
+          <div className="stats-summary-num">{outOfRange}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Nhiệt độ cao nhất</div>
+          <div className="stats-summary-num">{maxTemp != null ? `${maxTemp.toFixed(1)}°C` : "—"}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Nhiệt độ thấp nhất</div>
+          <div className="stats-summary-num">{minTemp != null ? `${minTemp.toFixed(1)}°C` : "—"}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Độ ẩm trung bình</div>
+          <div className="stats-summary-num">{avgHum != null ? `${avgHum}%` : "—"}</div>
+        </div>
+      </div>
+
+      <div className="sensor-cards-grid">
+        {SENSOR_IDS.map((id) => {
+          const sensor = latestBySensor.get(id);
+          const status = sensor?.sensor_status || "NO DATA";
+          const temp = sensor?.temperature;
+          const hum = sensor?.humidity;
+          const cls = classifyTemp(temp, limits);
+          const isOnline = status === "ONLINE";
+
+          return (
+            <div key={id} className={`sensor-card-large ${cls} ${isOnline ? "" : "offline"}`}>
+              <div className="sensor-card-top">
+                <div className={`sensor-card-id-badge ${cls}`}>
+                  {id}
+                </div>
+                <span className={`sensor-card-status-pill ${isOnline ? "online" : "offline"}`}>
+                  {isOnline ? "ONLINE" : status}
+                </span>
+              </div>
+
+              <div>
+                <div className="sensor-card-title">{SENSOR_NAMES[id]}</div>
+                <div className="sensor-card-loc">Cảm biến DHT22 · Vị trí khoang hàng</div>
+              </div>
+
+              <div className="sensor-card-metric-row">
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--color-text-4)", fontWeight: 700, textTransform: "uppercase" }}>Nhiệt độ</div>
+                  <div className={`sensor-card-temp-big ${cls}`}>
+                    {temp != null ? `${Number(temp).toFixed(1)}°C` : "—"}
+                  </div>
+                </div>
+                <div className="sensor-card-hum-box">
+                  <div style={{ fontSize: 10, color: "var(--color-text-4)", fontWeight: 700, textTransform: "uppercase" }}>Độ ẩm</div>
+                  <div className="sensor-card-hum-val">
+                    {hum != null ? `${Number(hum).toFixed(0)}%` : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="sensor-card-range-badge">
+                {cls === "normal" && <span className="text-success">✓ Trong ngưỡng ({limits.min}°C - {limits.max}°C)</span>}
+                {cls === "warn" && <span className="text-warning">⚠ Tiệm cận ngưỡng ({limits.min}°C - {limits.max}°C)</span>}
+                {cls === "alert" && <span className="text-danger">⛔ Vi phạm ngưỡng ({limits.min}°C - {limits.max}°C)!</span>}
+                {cls === "offline" && <span className="text-muted">Chưa nhận tín hiệu</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <article className="panel" aria-label="Biểu đồ toàn cảnh 5 cảm biến">
+        <div className="panel-header">
+          <div className="panel-title-group">
+            <div className="panel-eyebrow">Đồ thị thời gian thực</div>
+            <div className="panel-title">Diễn biến nhiệt độ 5 cảm biến theo hành trình</div>
+          </div>
+          <div className="live-badge">
+            <span className="live-dot" aria-hidden="true" />
+            LIVE · 4 GIÂY
+          </div>
+        </div>
+        <TrendChart packets={packets} limits={limits} />
+      </article>
+    </div>
+  );
+}
+
+/* ── 4. Trang Cảnh báo ── */
+function AlertsView({ alerts, onResolveAlert }) {
+  const openCount = alerts.filter((a) => a.status === "OPEN").length;
+  const resolvedCount = alerts.filter((a) => a.status === "RESOLVED").length;
+
+  return (
+    <div className="page-view alerts-view">
+      <div className="stats-summary-bar">
+        <div className={`stats-summary-card ${openCount > 0 ? "alert-highlight" : ""}`}>
+          <div className="stats-summary-label">Cảnh báo đang mở (Cần xử lý)</div>
+          <div className="stats-summary-num">{openCount}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Đã xử lý / Tự phục hồi</div>
+          <div className="stats-summary-num" style={{ color: "#15803d" }}>{resolvedCount}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Tổng sự cố ghi nhận</div>
+          <div className="stats-summary-num">{alerts.length}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Tình trạng khoang</div>
+          <div className="stats-summary-num" style={{ fontSize: 16, color: openCount > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
+            {openCount > 0 ? "⚠️ Cần kiểm tra ngay" : "✓ An toàn"}
+          </div>
+        </div>
+      </div>
+
+      <AlertPanel alerts={alerts} onResolve={onResolveAlert} />
+    </div>
+  );
+}
+
+/* ── 5. Trang Lịch sử ── */
+function HistoryView({ packets, lastChecked }) {
+  const bufferedCount = packets.filter((p) => p.is_buffered).length;
+  const liveCount = packets.length - bufferedCount;
+
+  return (
+    <div className="page-view history-view">
+      <div className="stats-summary-bar">
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Tổng số bản tin nhận</div>
+          <div className="stats-summary-num">{packets.length}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Bản tin trực tiếp (MQTT)</div>
+          <div className="stats-summary-num" style={{ color: "#0d9488" }}>{liveCount}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Bản tin đệm (Buffer recovered)</div>
+          <div className="stats-summary-num" style={{ color: "#d97706" }}>{bufferedCount}</div>
+        </div>
+        <div className="stats-summary-card">
+          <div className="stats-summary-label">Lần đồng bộ mới nhất</div>
+          <div className="stats-summary-num" style={{ fontSize: 15, fontFamily: "var(--font-mono)" }}>
+            {formatTimeShort(lastChecked)}
+          </div>
+        </div>
+      </div>
+
+      <HistoryTable packets={packets} lastChecked={lastChecked} limit={100} />
+    </div>
+  );
+}
+
+/* ── 6. Trang Bản đồ GPS ── */
+function TripMapView({
+  currentLocation,
+  routeHistory,
+  tripInfo,
+  activeRoute,
+  setActiveRoute,
+  simState,
+  setSimState,
+}) {
+  return (
+    <div className="page-view trip-map-view full-map-container">
+      <section className="panel map-panel" aria-label="Bản đồ hành trình GPS">
+        <div className="panel-header">
+          <div className="panel-title-group">
+            <div className="panel-eyebrow">GPS / Định vị lộ trình vận tải lạnh</div>
+            <div className="panel-title">Điều phối lộ trình & Giám sát vị trí xe tải</div>
+          </div>
+          <span className="updated-at-label">
+            {routeHistory.length} tọa độ đã ghi ·{" "}
+            {currentLocation ? formatTimeShort(currentLocation.timestamp) : "Đang chờ GPS"}
+          </span>
+        </div>
+        <TripMap
+          currentLocation={currentLocation}
+          routeHistory={routeHistory}
+          tripInfo={tripInfo}
+          activeRoute={activeRoute}
+          setActiveRoute={setActiveRoute}
+          simState={simState}
+          setSimState={setSimState}
+        />
+      </section>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
    APP (root)
    ════════════════════════════════════════════════════════════════ */
 
@@ -698,6 +1147,71 @@ function App() {
   const [driverMode,    setDriverMode]    = useState(false);
   const [liveState,     setLiveState]     = useState(null);
   const liveRowsRef = useRef([]);
+
+  /* ── Tuyến đường & Trạng thái mô phỏng đồng bộ toàn hệ thống (Option C) ── */
+  const [activeRoute, setActiveRoute] = useState({
+    controlMode: "custom", // "custom" | "live"
+    origin: LOGISTICS_HUBS.origins[0],
+    destination: LOGISTICS_HUBS.destinations[0],
+    coordinates: PLANNED_ROUTE,
+    distanceKm: 14.8,
+    durationMin: 28,
+  });
+
+  const [simState, setSimState] = useState({
+    simIndex: 0,
+    isSimulating: false,
+    simSpeed: 2,
+    position: PLANNED_ROUTE[0],
+    bearing: 45,
+    isStopped: false,
+    speedText: "0 km/h",
+  });
+
+  /* Timer chạy mô phỏng di chuyển xe (Chạy ngầm liên tục cho cả Dashboard & Driver Mode) */
+  useEffect(() => {
+    if (!simState.isSimulating) return;
+
+    const intervalMs = Math.max(200, Math.round(1500 / simState.simSpeed));
+    const timer = setInterval(() => {
+      setSimState((prev) => {
+        const coords = activeRoute.coordinates || [];
+        if (prev.simIndex >= coords.length - 1) {
+          return {
+            ...prev,
+            isSimulating: false,
+            isStopped: true,
+            speedText: "0 km/h",
+          };
+        }
+
+        const nextIdx = prev.simIndex + 1;
+        const curr = coords[prev.simIndex];
+        const next = coords[nextIdx];
+        let bearing = prev.bearing;
+        if (curr && next && (curr[0] !== next[0] || curr[1] !== next[1])) {
+          bearing = calculateBearing(curr[0], curr[1], next[0], next[1]);
+        }
+
+        const isStopped = nextIdx >= coords.length - 1;
+        const speedText = isStopped
+          ? "0 km/h"
+          : `${Math.round(35 * (prev.simSpeed >= 5 ? 1.5 : 1))} km/h`;
+
+        return {
+          ...prev,
+          simIndex: nextIdx,
+          position: next || curr,
+          bearing,
+          isStopped,
+          speedText,
+          isSimulating: !isStopped,
+        };
+      });
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [simState.isSimulating, simState.simSpeed, activeRoute.coordinates]);
 
   /* ── Data fetch ── */
   const refresh = useCallback(async (manual = false) => {
@@ -864,20 +1378,30 @@ function App() {
         .filter(
           (p) => p.trip_id === tripId && p.device_id === deviceId && isValidLocation(p)
         )
-        .map((p) => ({ latitude: p.latitude, longitude: p.longitude, timestamp: p.measured_at }))
+        .map((p) => ({
+          latitude: p.latitude,
+          longitude: p.longitude,
+          timestamp: p.measured_at,
+          vehicleStatus: p.vehicle_status || p.vehicleStatus,
+        }))
         .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)),
     [packets, tripId, deviceId]
   );
 
   const currentLocation = hasFreshLive && isValidLocation(latestPacket)
-    ? { latitude: latestPacket.latitude, longitude: latestPacket.longitude, timestamp: latestPacket.measured_at }
+    ? {
+        latitude: latestPacket.latitude,
+        longitude: latestPacket.longitude,
+        timestamp: latestPacket.measured_at,
+        vehicleStatus: latestPacket.vehicle_status || latestPacket.vehicleStatus,
+      }
     : routeHistory.at(-1) || null;
   const temperatures = [...latestBySensor.values()].map((r) => r.temperature).filter(Number.isFinite);
 
   /* ── Section navigation ── */
   function navigateTo(sectionId) {
     setActiveSection(sectionId);
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   /* ── Render ── */
@@ -896,6 +1420,10 @@ function App() {
           tripId={tripId}
           vehiclePlate={vehiclePlate}
           onExitDriverMode={() => setDriverMode(false)}
+          activeRoute={activeRoute}
+          setActiveRoute={setActiveRoute}
+          simState={simState}
+          setSimState={setSimState}
         />
       )}
 
@@ -903,6 +1431,7 @@ function App() {
         health={health}
         activeSection={activeSection}
         onNavigate={navigateTo}
+        openAlertsCount={alerts.filter((a) => a.status === "OPEN").length}
       />
 
       <div className="main-content">
@@ -914,6 +1443,7 @@ function App() {
             onRefresh={() => refresh(true)}
             isRefreshing={isRefreshing}
             onDriverMode={() => setDriverMode(true)}
+            activeSection={activeSection}
           />
 
           {/* Error banner */}
@@ -927,86 +1457,74 @@ function App() {
             </div>
           )}
 
-          {/* Trip hero */}
-          <TripBanner
-            tripId={tripId}
-            deviceId={deviceId}
-            tripState={tripState}
-            limits={limits}
-            vehiclePlate={vehiclePlate}
-          />
+          {/* ══════════════════════════════════════════════════
+              VIEW ROUTING (TỪNG TRANG RIÊNG BIỆT)
+             ══════════════════════════════════════════════════ */}
 
-          {/* KPI cards */}
-          <KpiGrid
-            latestPacket={latestPacket}
-            packets={packets}
-            latestBySensor={latestBySensor}
-            limits={limits}
-            outOfRange={outOfRange}
-          />
+          {/* 1. Trang Tổng quan */}
+          {activeSection === "overview" && (
+            <OverviewView
+              tripId={tripId}
+              deviceId={deviceId}
+              tripState={tripState}
+              limits={limits}
+              vehiclePlate={vehiclePlate}
+              latestPacket={latestPacket}
+              packets={packets}
+              latestBySensor={latestBySensor}
+              outOfRange={outOfRange}
+              currentLocation={currentLocation}
+              alerts={alerts}
+              onNavigate={navigateTo}
+            />
+          )}
 
-          {/* Control Panel */}
-          <ControlPanel
-            deviceId={deviceId}
-            tripId={tripId}
-            deliveryMode={deliveryMode}
-            setDeliveryMode={setDeliveryMode}
-            limits={limits}
-            onStarted={(result) => {
-              if (result.tripState) setTripState(result.tripState);
-              if (result.Tmin != null || result.Tmax != null)
-                setLimits({ min: result.Tmin, max: result.Tmax });
-            }}
-          />
+          {/* 2. Trang Điều khiển */}
+          {activeSection === "controls" && (
+            <ControlsView
+              deviceId={deviceId}
+              tripId={tripId}
+              deliveryMode={deliveryMode}
+              setDeliveryMode={setDeliveryMode}
+              limits={limits}
+              tripState={tripState}
+              setTripState={setTripState}
+              setLimits={setLimits}
+              vehiclePlate={vehiclePlate}
+              health={health}
+              latestPacket={latestPacket}
+            />
+          )}
 
-          {/* Chart + Sensors */}
-          <div className="content-grid">
-            <article className="panel" id="chart-panel" aria-label="Biểu đồ nhiệt độ">
-              <div className="panel-header">
-                <div className="panel-title-group">
-                  <div className="panel-eyebrow">Nhiệt độ theo thời gian</div>
-                  <div className="panel-title">Diễn biến nhiệt độ</div>
-                </div>
-                <div className="live-badge">
-                  <span className="live-dot" aria-hidden="true" />
-                  LIVE · 4 GIÂY
-                </div>
-              </div>
-              <TrendChart packets={packets} limits={limits} />
-            </article>
+          {/* 3. Trang Cảm biến */}
+          {activeSection === "sensors" && (
+            <SensorsView
+              latestBySensor={latestBySensor}
+              limits={limits}
+              packets={packets}
+              outOfRange={outOfRange}
+            />
+          )}
 
-            <article className="panel" id="sensors" aria-label="Danh sách cảm biến">
-              <div className="panel-header">
-                <div className="panel-title-group">
-                  <div className="panel-eyebrow">Thiết bị ESP32</div>
-                  <div className="panel-title">Cảm biến</div>
-                </div>
-                <span className="sensor-count-badge">
-                  {[...latestBySensor.values()].filter((r) => r.sensor_status === "ONLINE").length}/5 online
-                </span>
-              </div>
-              <SensorList latestBySensor={latestBySensor} limits={limits} />
-            </article>
-          </div>
+          {/* 4. Trang Cảnh báo */}
+          {activeSection === "alerts" && (
+            <AlertsView
+              alerts={alerts}
+              onResolveAlert={handleResolveAlert}
+            />
+          )}
 
-          <AlertPanel alerts={alerts} onResolve={handleResolveAlert} />
+          {/* 5. Trang Lịch sử */}
+          {activeSection === "history" && (
+            <HistoryView
+              packets={displayPackets}
+              lastChecked={lastChecked}
+            />
+          )}
 
-          {/* History table */}
-          <HistoryTable packets={displayPackets} lastChecked={lastChecked} />
-
-          {/* Map */}
-          <section className="panel map-panel" id="trip-map" aria-label="Bản đồ hành trình">
-            <div className="panel-header">
-              <div className="panel-title-group">
-                <div className="panel-eyebrow">GPS / Hành trình</div>
-                <div className="panel-title">Vị trí xe tải</div>
-              </div>
-              <span className="updated-at-label">
-                {routeHistory.length} điểm ·{" "}
-                {currentLocation ? formatTimeShort(currentLocation.timestamp) : "Đang chờ GPS"}
-              </span>
-            </div>
-            <TripMap
+          {/* 6. Trang Bản đồ GPS */}
+          {activeSection === "trip-map" && (
+            <TripMapView
               currentLocation={currentLocation}
               routeHistory={routeHistory}
               tripInfo={{
@@ -1014,9 +1532,14 @@ function App() {
                 vehiclePlate,
                 currentTemp: temperatures.length ? Math.max(...temperatures) : null,
                 doorStatus:  latestPacket?.door_status,
+                vehicleStatus: latestPacket?.vehicle_status || latestPacket?.vehicleStatus,
               }}
+              activeRoute={activeRoute}
+              setActiveRoute={setActiveRoute}
+              simState={simState}
+              setSimState={setSimState}
             />
-          </section>
+          )}
 
           {/* Footer */}
           <footer className="page-footer">

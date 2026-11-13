@@ -10,8 +10,10 @@
     { "sensorId": "S5", "temperature": 5.3, "humidity": 67, "status": "ONLINE" }
   ],
   "door": "CLOSED",
-  "latitude": 10.762622,
-  "longitude": 106.660172,
+  "latitude": 10.865500,
+  "longitude": 106.745500,
+  "vehicleStatus": "RUNNING",
+  "speed": 38.5,
   "timestamp": "2026-09-10T10:30:00+07:00",
   "isBuffered": false,
   "type": "TELEMETRY"

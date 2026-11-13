@@ -52,7 +52,8 @@ constexpr uint32_t DEBOUNCE_MS = 45;
 constexpr uint32_t DOOR_HOLD_MS = 5000;
 constexpr uint32_t WIFI_RETRY_MS = 10000;
 constexpr uint32_t MQTT_RETRY_MS = 5000;
-constexpr uint32_t GPS_STEP_MS = 30000;
+constexpr uint32_t GPS_STEP_MS = 12000;
+constexpr uint32_t DWELL_AT_DELIVERY_MS = 36000;
 constexpr uint32_t ALERT_BLINK_MS = 350;
 
 const char* const DEVICE_ID_VALUE = DEVICE_ID;
@@ -112,15 +113,41 @@ char tripId[32] = "TRIP001";
 char profileId[48] = "VEGETABLE_CHILLED";
 char tripState[20] = "IN_TRANSIT";
 
-// Approximate route within Ho Chi Minh City. These are simulated coordinates.
+// Route within Ho Chi Minh City:
+// From Thu Duc Wholesale Market Cold Depot -> Co.opmart Cong Quynh, District 1.
 struct Coordinate { double latitude; double longitude; };
 const Coordinate ROUTE[] = {
-  {10.762622, 106.660172}, {10.767100, 106.664300},
-  {10.772500, 106.669100}, {10.778000, 106.674500},
-  {10.783400, 106.680000}, {10.789000, 106.685800}
+  {10.865500, 106.745500}, // 1. Kho Lạnh Chợ Đầu Mối Nông Sản Thủ Đức (Xuất phát)
+  {10.861200, 106.739800}, // 2. QL1A - Nút giao Gò Dưa
+  {10.855000, 106.731000}, // 3. Đường Tô Ngọc Vân
+  {10.849000, 106.722000}, // 4. Đại lộ Phạm Văn Đồng - Linh Tây
+  {10.843000, 106.713500}, // 5. Phạm Văn Đồng - Linh Đông
+  {10.836500, 106.705000}, // 6. Phạm Văn Đồng - Hiệp Bình Chánh
+  {10.830000, 106.697500}, // 7. Phạm Văn Đồng - Gần Gigamall
+  {10.824000, 106.692500}, // 8. Cầu Bình Lợi mới
+  {10.817500, 106.699000}, // 9. Cầu Bình Triệu / Đinh Bộ Lĩnh
+  {10.811000, 106.706000}, // 10. Đinh Bộ Lĩnh - Bến xe Miền Đông cũ
+  {10.803500, 106.711000}, // 11. Đinh Bộ Lĩnh - Bạch Đằng
+  {10.800000, 106.711800}, // 12. Ngã tư Hàng Xanh
+  {10.795000, 106.706000}, // 13. Điện Biên Phủ - Cầu Điện Biên Phủ
+  {10.790000, 106.699500}, // 14. Điện Biên Phủ - Vòng xoay Nguyễn Bỉnh Khiêm
+  {10.785000, 106.694000}, // 15. Điện Biên Phủ - Công viên Lê Văn Tám
+  {10.781000, 106.691000}, // 16. Hai Bà Trưng - Tân Định
+  {10.777000, 106.695500}, // 17. Nam Kỳ Khởi Nghĩa - Dinh Độc Lập
+  {10.771000, 106.691500}, // 18. Nguyễn Thị Minh Khai - Công viên Tao Đàn
+  {10.768000, 106.688000}, // 19. CMT8 - Ngã sáu Phù Đổng
+  {10.765000, 106.685000}, // 20. Cống Quỳnh - Bệnh viện Từ Dũ
+  {10.762200, 106.682500}  // 21. Siêu thị Co.opmart Cống Quỳnh, Q.1 (Điểm giao hàng)
 };
 constexpr size_t ROUTE_COUNT = sizeof(ROUTE) / sizeof(ROUTE[0]);
 size_t routeIndex = 0;
+
+enum VehicleState {
+  VEHICLE_RUNNING,
+  VEHICLE_STOPPED
+};
+VehicleState vehicleState = VEHICLE_RUNNING;
+uint32_t stopStartedMs = 0;
 
 size_t ringTail() { return (ringHead + ringCount) % RING_CAPACITY; }
 
@@ -367,9 +394,37 @@ void readDoor() {
 
 void updateSimulatedGPS() {
   const uint32_t now = millis();
-  if (now - lastGpsStepMs >= GPS_STEP_MS) {
-    lastGpsStepMs = now;
-    routeIndex = (routeIndex + 1) % ROUTE_COUNT;
+  if (vehicleState == VEHICLE_RUNNING) {
+    if (now - lastGpsStepMs >= GPS_STEP_MS) {
+      lastGpsStepMs = now;
+      if (routeIndex < ROUTE_COUNT - 1) {
+        routeIndex++;
+        Serial.printf("GPS moving -> [%u/%u] (%.6f, %.6f) - RUNNING\n",
+          static_cast<unsigned>(routeIndex + 1), static_cast<unsigned>(ROUTE_COUNT),
+          ROUTE[routeIndex].latitude, ROUTE[routeIndex].longitude);
+        if (routeIndex == ROUTE_COUNT - 1) {
+          vehicleState = VEHICLE_STOPPED;
+          stopStartedMs = now;
+          Serial.println("=================================================");
+          Serial.println(">>> REACHED DELIVERY POINT! Vehicle is STOPPED.");
+          Serial.printf(">>> Waiting at delivery stop (%lu ms dwell time)...\n", static_cast<unsigned long>(DWELL_AT_DELIVERY_MS));
+          Serial.println("=================================================");
+        }
+      }
+    }
+  } else if (vehicleState == VEHICLE_STOPPED) {
+    const uint32_t elapsed = now - stopStartedMs;
+    if (elapsed >= DWELL_AT_DELIVERY_MS) {
+      Serial.println("=================================================");
+      Serial.println(">>> Delivery completed! Starting new trip cycle from start point.");
+      Serial.println("=================================================");
+      vehicleState = VEHICLE_RUNNING;
+      routeIndex = 0;
+      lastGpsStepMs = now;
+    } else {
+      Serial.printf(">>> Vehicle STOPPED at delivery: %lu/%lu s elapsed\n",
+        static_cast<unsigned long>(elapsed / 1000UL), static_cast<unsigned long>(DWELL_AT_DELIVERY_MS / 1000UL));
+    }
   }
 }
 
@@ -498,6 +553,8 @@ String makeTelemetryPayload() {
   doc["latitude"] = ROUTE[routeIndex].latitude;
   doc["longitude"] = ROUTE[routeIndex].longitude;
   doc["gpsSimulated"] = true;
+  doc["vehicleStatus"] = (vehicleState == VEHICLE_STOPPED) ? "STOPPED" : "RUNNING";
+  doc["speed"] = (vehicleState == VEHICLE_STOPPED) ? 0.0 : 38.5;
   doc["timestamp"] = currentTimestamp();
   doc["timeSynchronized"] = clockSynchronized;
   doc["isBuffered"] = false;
@@ -548,7 +605,12 @@ void sampleAndPublish() {
   updateClockStatus();
   checkLocalAlerts();
   String payload = makeTelemetryPayload();
-  Serial.printf("Door=%s | GPS(sim)=%.6f, %.6f | MQTT=%s\n", doorOpen ? "OPEN" : "CLOSED", ROUTE[routeIndex].latitude, ROUTE[routeIndex].longitude, mqtt.connected() ? "ONLINE" : "OFFLINE");
+  Serial.printf("Door=%s | GPS(sim)=%.6f, %.6f [%s] | MQTT=%s\n",
+    doorOpen ? "OPEN" : "CLOSED",
+    ROUTE[routeIndex].latitude,
+    ROUTE[routeIndex].longitude,
+    vehicleState == VEHICLE_STOPPED ? "STOPPED" : "RUNNING",
+    mqtt.connected() ? "ONLINE" : "OFFLINE");
   Serial.println(payload);
   if (mqtt.connected() && ringCount == 0 && publishTelemetry(payload.c_str())) {
     Serial.println("Live telemetry accepted by PubSubClient (QoS 0; no PUBACK guarantee).");

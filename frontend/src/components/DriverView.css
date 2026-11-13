@@ -323,7 +323,257 @@
 .dv-gps-time  { font-size: 15px; font-weight: 700; color: white; font-family: 'JetBrains Mono', monospace; }
 .dv-gps-none  { font-size: 10px; color: rgba(255,255,255,0.30); margin-top: 2px; }
 
-/* ── Truck marker pin ── */
+/* ── Depot pins for Driver Mode ── */
+.dv-depot-pin {
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  border: 1.5px solid white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+.dv-pin-start {
+  background: #059669;
+}
+.dv-pin-delivery {
+  background: #e11d48;
+}
+
+/* ── Vehicle status card in status panel ── */
+.dv-vehicle-card {
+  background: rgba(15, 40, 48, 0.90);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 2px solid transparent;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  transition: all 0.3s ease;
+}
+
+.dv-vehicle-card.running {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.dv-vehicle-card.stopped {
+  border-color: rgba(220, 38, 38, 0.6);
+  background: rgba(220, 38, 38, 0.16);
+  animation: flash-border 1.2s infinite;
+}
+
+.dv-vehicle-icon { font-size: 26px; flex-shrink: 0; }
+.dv-vehicle-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.40);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.dv-vehicle-value {
+  font-size: 17px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: 0.02em;
+}
+.dv-vehicle-card.running .dv-vehicle-value { color: #4ade80; }
+.dv-vehicle-card.stopped .dv-vehicle-value { color: #f87171; }
+.dv-vehicle-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 2px;
+}
+
+/* ── Route Card in Driver View (Đồng bộ lộ trình) ── */
+.dv-route-card {
+  background: rgba(15, 40, 48, 0.90);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.dv-route-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #5eead4;
+  text-transform: uppercase;
+}
+
+.dv-route-endpoints {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-route-endpoints .ep-start { color: #34d399; }
+.dv-route-endpoints .ep-arrow { color: rgba(255, 255, 255, 0.4); font-size: 11px; }
+.dv-route-endpoints .ep-end { color: #f43f5e; }
+
+.dv-route-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── HUD Mini Điều Khiển Mô Phỏng Trên Xe ── */
+.dv-sim-hud {
+  position: absolute;
+  top: 14px;
+  left: 230px;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 40, 48, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 5px 10px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.dv-hud-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: white;
+}
+
+.dv-hud-btn.play {
+  background: #0d9488;
+}
+
+.dv-hud-btn.pause {
+  background: #d97706;
+}
+
+.dv-hud-btn.reset {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dv-hud-speed {
+  display: inline-flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px;
+  border-radius: 10px;
+}
+
+.dv-hud-zoom {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 2px;
+}
+
+/* ── Leaflet Zoom Controls in Driver View ── */
+.dv-shell .leaflet-bottom.leaflet-right {
+  bottom: 50px !important;
+  right: 14px !important;
+}
+
+.dv-shell .leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dv-shell .leaflet-control-zoom a {
+  background: rgba(15, 40, 48, 0.94) !important;
+  color: #ffffff !important;
+  width: 38px !important;
+  height: 38px !important;
+  line-height: 38px !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  transition: background 0.18s;
+}
+
+.dv-shell .leaflet-control-zoom a:hover {
+  background: #0d9488 !important;
+}
+
+.dv-hud-spd {
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dv-hud-spd.active {
+  background: #0d9488;
+  color: white;
+}
+
+.dv-truck-pin-outer {
+  display: grid;
+  place-items: center;
+}
+
+/* ── Truck marker pin & status pill ── */
+.dv-truck-icon-container { background: none; border: none; }
+.dv-truck-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 130px;
+}
+.dv-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: 1.5px solid white;
+  margin-bottom: 2px;
+}
+.dv-status-pill.running {
+  background: #059669;
+}
+.dv-status-pill.stopped {
+  background: #dc2626;
+  animation: pulse-border 1.2s infinite;
+}
+.dv-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.dv-status-dot.running { background: #34d399; animation: pulse-green 1.5s infinite; }
+.dv-status-dot.stopped { background: #fca5a5; animation: blink 0.7s step-start infinite; }
+
 .dv-truck-pin {
   width: 52px;
   height: 52px;
@@ -335,6 +585,10 @@
   display: grid;
   place-items: center;
   color: white;
+}
+.dv-truck-wrap.stopped .dv-truck-pin {
+  background: #dc2626;
+  box-shadow: 0 4px 18px rgba(220, 38, 38, 0.55);
 }
 .dv-truck-pin svg { width: 32px; height: 32px; transform: rotate(45deg); }
 
