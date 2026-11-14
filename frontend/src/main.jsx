@@ -26,6 +26,9 @@ import TripMap, {
 } from "./components/TripMap";
 import DriverView from "./components/DriverView";
 import ControlPanel from "./components/ControlPanel";
+import DemoScenarioPanel from "./components/DemoScenarioPanel";
+import TripReportView from "./components/TripReportView";
+import RouteManagementView from "./components/RouteManagementView";
 import "./style.css";
 
 /* ──────────────── CONSTANTS ──────────────── */
@@ -120,6 +123,10 @@ const SECTION_METAS = {
     label: "Smart Cold Chain / Điều khiển",
     title: "Bảng điều khiển & Cài đặt hành trình",
   },
+  routes: {
+    label: "Smart Cold Chain / Quản lý tuyến",
+    title: "Quản lý các tuyến đường & Điều phối chuyến vận chuyển",
+  },
   sensors: {
     label: "Smart Cold Chain / Cảm biến",
     title: "Giám sát chi tiết 5 cảm biến DHT22",
@@ -136,16 +143,22 @@ const SECTION_METAS = {
     label: "Smart Cold Chain / Bản đồ GPS",
     title: "Bản đồ lộ trình & Định vị xe trực tiếp",
   },
+  reports: {
+    label: "Smart Cold Chain / Báo cáo",
+    title: "Báo cáo cuối chuyến hàng & Xuất chứng nhận",
+  },
 };
 
 function Sidebar({ health, activeSection, onNavigate, openAlertsCount = 0 }) {
   const navItems = [
     { id: "overview",  label: "Tổng quan",     icon: "⊞" },
     { id: "controls",  label: "Điều khiển",    icon: "⚙" },
+    { id: "routes",    label: "Quản lý tuyến", icon: "🛣️" },
     { id: "sensors",   label: "Cảm biến",      icon: "◉" },
     { id: "alerts",    label: "Cảnh báo",      icon: "⚠", badge: openAlertsCount },
     { id: "history",   label: "Lịch sử",       icon: "⊙" },
     { id: "trip-map",  label: "Bản đồ GPS",    icon: "⊕" },
+    { id: "reports",   label: "Báo cáo chuyến",icon: "📋" },
   ];
 
   const statusText = {
@@ -199,7 +212,7 @@ function Sidebar({ health, activeSection, onNavigate, openAlertsCount = 0 }) {
    TOP BAR
    ════════════════════════════════════════════════════════════════ */
 
-function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode, activeSection }) {
+function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode, activeSection, onNavigate }) {
   const meta = SECTION_METAS[activeSection] || SECTION_METAS.overview;
   const badgeLabel = {
     online:   "Đang hoạt động",
@@ -215,6 +228,24 @@ function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode, ac
       </div>
 
       <div className="topbar-right">
+        {/* Nút Demo kịch bản một nút bấm */}
+        <button
+          className="btn btn-demo-shortcut"
+          type="button"
+          onClick={() => {
+            if (onNavigate) {
+              onNavigate("controls");
+              setTimeout(() => {
+                const el = document.getElementById("demo-scenarios");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+            }
+          }}
+          title="Chạy kịch bản demo mất mạng và xả đệm một nút bấm"
+        >
+          ⚡ Demo mất mạng
+        </button>
+
         {/* Driver Mode button */}
         <button
           className="btn btn-driver-mode"
@@ -256,8 +287,9 @@ function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode, ac
    TRIP BANNER
    ════════════════════════════════════════════════════════════════ */
 
-function TripBanner({ tripId, deviceId, tripState, limits, vehiclePlate }) {
+function TripBanner({ tripId, deviceId, tripState, limits, vehiclePlate, onNavigate }) {
   const stateLabel = TRIP_STATE_LABELS[tripState] || tripState || "—";
+  const isCompleted = tripState === "COMPLETED";
 
   return (
     <section className="trip-banner" id="overview" aria-label="Thông tin chuyến hiện tại">
@@ -292,6 +324,29 @@ function TripBanner({ tripId, deviceId, tripState, limits, vehiclePlate }) {
           {limits.max == null ? "—" : `${limits.max}°C`}
         </div>
       </div>
+
+      {onNavigate && (
+        <button
+          className="quick-card-btn"
+          style={{
+            marginLeft: "auto",
+            background: isCompleted ? "var(--color-primary)" : "rgba(255, 255, 255, 0.08)",
+            color: "var(--color-text)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            padding: "8px 14px",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 6
+          }}
+          onClick={() => onNavigate("reports")}
+          title="Xem báo cáo tổng kết chuyến hàng & Xuất file"
+        >
+          📋 {isCompleted ? "Xem báo cáo đã chốt" : "Báo cáo cuối chuyến"}
+        </button>
+      )}
     </section>
   );
 }
@@ -731,6 +786,7 @@ function OverviewView({
   currentLocation,
   alerts,
   onNavigate,
+  activeRoute,
 }) {
   const openAlerts = alerts.filter((a) => a.status === "OPEN");
 
@@ -742,6 +798,7 @@ function OverviewView({
         tripState={tripState}
         limits={limits}
         vehiclePlate={vehiclePlate}
+        onNavigate={onNavigate}
       />
 
       <KpiGrid
@@ -833,6 +890,46 @@ function OverviewView({
             Quản lý cảnh báo →
           </button>
         </div>
+
+        <div className="quick-card">
+          <div>
+            <div className="quick-card-header">
+              <span className="quick-card-title">📋 Báo cáo cuối chuyến</span>
+              <span className={`badge-dot ${tripState === "COMPLETED" ? "online" : "offline"}`} />
+            </div>
+            <div className="quick-card-body" style={{ marginTop: 8 }}>
+              <div>
+                Trạng thái: <strong>{tripState === "COMPLETED" ? "Đã kết thúc & sẵn sàng xuất file" : "Đang vận chuyển"}</strong>
+              </div>
+              <div className="quick-card-meta">
+                <span>KPI: Thời gian, nhiệt độ Min/Max, vượt ngưỡng, cửa mở, mất mạng</span>
+              </div>
+            </div>
+          </div>
+          <button className="quick-card-btn" onClick={() => onNavigate("reports")}>
+            Xem & Xuất CSV / PDF →
+          </button>
+        </div>
+
+        <div className="quick-card">
+          <div>
+            <div className="quick-card-header">
+              <span className="quick-card-title">🛣️ Quản lý các tuyến đường</span>
+              <span className="badge-dot" style={{ background: "#2dd4bf" }} />
+            </div>
+            <div className="quick-card-body" style={{ marginTop: 8 }}>
+              <div>
+                Tuyến hiện tại: <strong>{activeRoute?.origin?.shortName || "Kho xuất phát"} ➔ {activeRoute?.destination?.shortName || "Điểm giao"}</strong>
+              </div>
+              <div className="quick-card-meta">
+                <span>Cự ly: {activeRoute?.distanceKm} km · Dự kiến: {activeRoute?.durationMin} phút</span>
+              </div>
+            </div>
+          </div>
+          <button className="quick-card-btn" onClick={() => onNavigate("routes")}>
+            Quản lý & Điều phối tuyến →
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -851,6 +948,9 @@ function ControlsView({
   vehiclePlate,
   health,
   latestPacket,
+  onRefresh,
+  onNavigate,
+  onTripStarted,
 }) {
   return (
     <div className="page-view controls-view">
@@ -860,6 +960,7 @@ function ControlsView({
         tripState={tripState}
         limits={limits}
         vehiclePlate={vehiclePlate}
+        onNavigate={onNavigate}
       />
 
       <ControlPanel
@@ -869,10 +970,19 @@ function ControlsView({
         setDeliveryMode={setDeliveryMode}
         limits={limits}
         onStarted={(result) => {
+          if (onTripStarted) onTripStarted(result);
           if (result.tripState) setTripState(result.tripState);
           if (result.Tmin != null || result.Tmax != null)
             setLimits({ min: result.Tmin, max: result.Tmax });
         }}
+      />
+
+      {/* ── Kịch bản Demo Một Nút Bấm (ESP32 → MQTT → Backend → Dashboard) ── */}
+      <DemoScenarioPanel
+        deviceId={deviceId}
+        tripId={tripId}
+        health={health}
+        onRefresh={onRefresh}
       />
 
       <div className="device-info-panel">
@@ -1146,6 +1256,7 @@ function App() {
   const [isRefreshing,  setIsRefreshing]  = useState(false);
   const [driverMode,    setDriverMode]    = useState(false);
   const [liveState,     setLiveState]     = useState(null);
+  const [currentTripId, setCurrentTripId] = useState(null);
   const liveRowsRef = useRef([]);
 
   /* ── Tuyến đường & Trạng thái mô phỏng đồng bộ toàn hệ thống (Option C) ── */
@@ -1240,8 +1351,19 @@ function App() {
       setError("");
       setLastChecked(new Date());
 
-      const tripId = next[0]?.trip_id;
-      const alertQuery = tripId ? `&tripId=${encodeURIComponent(tripId)}` : "";
+      // Tìm chuyến đang chạy từ Backend
+      let activeTrip = null;
+      try {
+        const activeRes = await fetch(`${API_BASE}/api/trips/active?deviceId=ESP32-01`);
+        if (activeRes.ok) activeTrip = await activeRes.json();
+      } catch {}
+
+      const effectiveTripId = currentTripId || activeTrip?.trip_id || next[0]?.trip_id;
+      if (activeTrip && !currentTripId) {
+        setCurrentTripId(activeTrip.trip_id);
+      }
+
+      const alertQuery = effectiveTripId ? `&tripId=${encodeURIComponent(effectiveTripId)}` : "";
       const [openRes, resolvedRes] = await Promise.all([
         fetch(`${API_BASE}/api/alerts?status=OPEN${alertQuery}`),
         fetch(`${API_BASE}/api/alerts?status=RESOLVED${alertQuery}`),
@@ -1249,8 +1371,14 @@ function App() {
       if (!openRes.ok || !resolvedRes.ok) throw new Error("Không tải được cảnh báo");
       const [openAlerts, resolvedAlerts] = await Promise.all([openRes.json(), resolvedRes.json()]);
       setAlerts([...openAlerts, ...resolvedAlerts]);
-      if (tripId) {
-        const tripRes = await fetch(`${API_BASE}/api/trips/${encodeURIComponent(tripId)}`);
+
+      if (activeTrip) {
+        setLimits({ min: activeTrip.min_temperature ?? null, max: activeTrip.max_temperature ?? null });
+        setTripState(activeTrip.trip_state || "UNKNOWN");
+        setDeliveryMode(Boolean(activeTrip.delivery_mode));
+        setVehiclePlate(activeTrip.vehicle_plate || "");
+      } else if (effectiveTripId) {
+        const tripRes = await fetch(`${API_BASE}/api/trips/${encodeURIComponent(effectiveTripId)}`);
         if (tripRes.ok) {
           const trip = await tripRes.json();
           setLimits({ min: trip.min_temperature ?? null, max: trip.max_temperature ?? null });
@@ -1335,7 +1463,7 @@ function App() {
     ? [freshLivePacket, ...packets.filter((packet) => packet.packet_id !== freshLivePacket.packet_id)]
     : packets;
 
-  const tripId   = latestPacket?.trip_id   || "TRIP001";
+  const tripId   = currentTripId || latestPacket?.trip_id || "TRIP001";
   const deviceId = latestPacket?.device_id || "ESP32-01";
   const hasFreshLive = Boolean(freshLivePacket && liveState.deviceId === deviceId && liveState.tripId === tripId);
   const deviceOffline = !hasFreshLive && deviceStates.find((device) => device.device_id === deviceId)?.status !== "ONLINE";
@@ -1404,6 +1532,21 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function handleEndTrip(result) {
+    setTripState("COMPLETED");
+    setActiveSection("reports");
+    refresh(true);
+  }
+
+  function handleTripStarted(result) {
+    if (result.tripId) setCurrentTripId(result.tripId);
+    if (result.tripState) setTripState(result.tripState);
+    if (result.Tmin != null || result.Tmax != null) {
+      setLimits({ min: result.Tmin, max: result.Tmax });
+    }
+    refresh(true);
+  }
+
   /* ── Render ── */
   return (
     <div className="app-shell">
@@ -1444,6 +1587,7 @@ function App() {
             isRefreshing={isRefreshing}
             onDriverMode={() => setDriverMode(true)}
             activeSection={activeSection}
+            onNavigate={navigateTo}
           />
 
           {/* Error banner */}
@@ -1476,6 +1620,7 @@ function App() {
               currentLocation={currentLocation}
               alerts={alerts}
               onNavigate={navigateTo}
+              activeRoute={activeRoute}
             />
           )}
 
@@ -1493,6 +1638,9 @@ function App() {
               vehiclePlate={vehiclePlate}
               health={health}
               latestPacket={latestPacket}
+              onRefresh={() => refresh(true)}
+              onNavigate={navigateTo}
+              onTripStarted={handleTripStarted}
             />
           )}
 
@@ -1538,6 +1686,37 @@ function App() {
               setActiveRoute={setActiveRoute}
               simState={simState}
               setSimState={setSimState}
+            />
+          )}
+
+          {/* 7. Trang Báo cáo cuối chuyến */}
+          {activeSection === "reports" && (
+            <TripReportView
+              tripId={tripId}
+              deviceId={deviceId}
+              tripState={tripState}
+              limits={limits}
+              vehiclePlate={vehiclePlate}
+              packets={displayPackets}
+              alerts={alerts}
+              onEndTrip={handleEndTrip}
+              onNavigate={navigateTo}
+            />
+          )}
+
+          {/* 8. Trang Quản lý tuyến đường & Điều phối */}
+          {activeSection === "routes" && (
+            <RouteManagementView
+              activeRoute={activeRoute}
+              setActiveRoute={setActiveRoute}
+              simState={simState}
+              setSimState={setSimState}
+              tripId={tripId}
+              onSelectTrip={(newTripId) => {
+                setCurrentTripId(newTripId);
+                refresh(true);
+              }}
+              onNavigate={navigateTo}
             />
           )}
 

@@ -1,0 +1,423 @@
+/* ============================================================
+   TripReportView.css — Báo cáo cuối chuyến hàng chuỗi lạnh
+   ============================================================ */
+
+.trip-report-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Thanh công cụ trên cùng của Báo cáo ── */
+.report-action-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  padding: 14px 20px;
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--color-border, #e2e8f0);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.report-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.report-trip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f2830;
+}
+
+.report-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-report-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+}
+
+.btn-report-action:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+
+.btn-report-action.primary {
+  background: #0d9488;
+  color: white;
+  border-color: #0d9488;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+}
+
+.btn-report-action.primary:hover {
+  background: #0f766e;
+}
+
+.btn-report-action.danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.btn-report-action.danger:hover {
+  background: #fecaca;
+}
+
+/* ── Tờ giấy báo cáo chuẩn in ấn / PDF (Paper Document) ── */
+.report-paper {
+  background: white;
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--color-border, #e2e8f0);
+  padding: 36px 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* Header tài liệu */
+.report-doc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #0f2830;
+  margin-bottom: 24px;
+}
+
+.report-doc-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.report-doc-logo {
+  width: 52px;
+  height: 52px;
+  background: #0d9488;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 26px;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+}
+
+.report-doc-title h2 {
+  font-size: 19px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.report-doc-title p {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  font-weight: 500;
+}
+
+.report-compliance-stamp {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', 'Inter', monospace;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-align: center;
+  border: 2px solid;
+}
+
+.report-compliance-stamp.compliant {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #10b981;
+}
+
+.report-compliance-stamp.non-compliant {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #ef4444;
+}
+
+/* Bảng thông tin chuyến hàng */
+.report-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 18px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #f1f5f9;
+  margin-bottom: 28px;
+}
+
+.report-meta-col dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 4px;
+  letter-spacing: 0.03em;
+}
+
+.report-meta-col dd {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* ── 5 THẺ CHỈ SỐ CỐT LÕI (CORE METRICS CARDS) ── */
+.report-section-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f2830;
+  margin: 0 0 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-core-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.report-kpi-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.report-kpi-card.warn-border {
+  border-color: #fca5a5;
+  background: #fffafa;
+}
+
+.report-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.report-kpi-icon {
+  font-size: 20px;
+}
+
+.report-kpi-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.report-kpi-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  font-family: 'JetBrains Mono', 'Inter', monospace;
+  margin: 6px 0;
+}
+
+.report-kpi-value.danger {
+  color: #dc2626;
+}
+
+.report-kpi-value.success {
+  color: #059669;
+}
+
+.report-kpi-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.3;
+}
+
+/* Bảng phân tích chi tiết cảm biến */
+.report-table-wrapper {
+  margin-bottom: 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.report-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.report-data-table th {
+  background: #f8fafc;
+  padding: 10px 14px;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 11.5px;
+  text-transform: uppercase;
+}
+
+.report-data-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.report-data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.report-data-table tbody tr:hover {
+  background: #fdfefe;
+}
+
+/* Bảng sự cố */
+.alert-row-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.alert-row-badge.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.alert-row-badge.warn {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* Footer chữ ký xác nhận của báo cáo */
+.report-signatures-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px dashed #cbd5e1;
+  text-align: center;
+}
+
+.sig-box-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 60px;
+}
+
+.sig-box-note {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CHẾ ĐỘ IN ẤN & XUẤT PDF CHUYÊN NGHIỆP (@media print)
+   ══════════════════════════════════════════════════════════════ */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  .sidebar,
+  .topbar,
+  .page-footer,
+  .report-action-toolbar,
+  .btn,
+  .btn-report-action {
+    display: none !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .main-inner {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .report-paper {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .report-doc-header {
+    border-bottom: 2pt solid black !important;
+  }
+
+  .report-compliance-stamp {
+    border: 2pt solid black !important;
+    color: black !important;
+  }
+
+  .report-meta-grid,
+  .report-table-wrapper {
+    border: 1pt solid #ccc !important;
+  }
+
+  .report-core-kpi-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    page-break-inside: avoid;
+  }
+
+  .report-kpi-card {
+    border: 1pt solid #aaa !important;
+    box-shadow: none !important;
+  }
+
+  .report-signatures-row {
+    page-break-inside: avoid;
+  }
+}
+
+@media (max-width: 900px) {
+  .report-meta-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .report-core-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

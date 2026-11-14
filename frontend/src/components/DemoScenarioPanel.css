@@ -1,0 +1,401 @@
+/* ============================================================
+   DemoScenarioPanel.css — Giao diện Kịch bản Demo Một Nút Bấm
+   ============================================================ */
+
+.demo-scenario-panel {
+  background: white;
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--color-border, #e2e8f0);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  margin-top: 24px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.demo-scenario-panel.running {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2), 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.demo-scenario-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fafbfc;
+}
+
+.demo-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.demo-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #b45309;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  border: 1px solid #fde68a;
+}
+
+.demo-title-group h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 3px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-title-group p {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+.demo-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.demo-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.demo-scenario-body {
+  padding: 20px;
+}
+
+/* ── Thẻ kịch bản chính ── */
+.scenario-card {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  background: #ffffff;
+  transition: all 0.2s;
+}
+
+.scenario-card:hover {
+  border-color: #cbd5e1;
+}
+
+.scenario-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.scenario-info-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f2830;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.scenario-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  letter-spacing: 0.02em;
+}
+
+.scenario-desc {
+  font-size: 12.5px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Quy trình 4 bước giải thích ── */
+.flow-pipeline-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #f1f5f9;
+}
+
+.pipeline-step-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  position: relative;
+}
+
+.pipeline-step-header {
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pipeline-step-desc {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* ── Bộ chọn thời gian ngắt sóng ── */
+.outage-duration-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.duration-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.duration-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.duration-pill {
+  border: 1px solid #cbd5e1;
+  background: white;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.duration-pill:hover {
+  background: #f1f5f9;
+}
+
+.duration-pill.active {
+  background: #0d9488;
+  color: white;
+  border-color: #0d9488;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);
+}
+
+.duration-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Nút kích hoạt kịch bản ── */
+.scenario-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-run-scenario {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: white;
+  border: none;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
+  transition: all 0.2s;
+}
+
+.btn-run-scenario:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0f766e, #115e59);
+  transform: translateY(-1px);
+}
+
+.btn-run-scenario:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-reconnect-now {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-reconnect-now:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+/* ── Live Progress Tracker (Khi kịch bản đang chạy) ── */
+.scenario-live-tracker {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1.5px solid #fde68a;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tracker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tracker-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #92400e;
+}
+
+.tracker-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 800;
+  background: #fef3c7;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.tracker-timer.pulse {
+  animation: pulse-ring 1s infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Thanh tiến trình phần trăm */
+.tracker-progress-bar-container {
+  height: 8px;
+  background: #fde68a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.tracker-progress-bar-fill {
+  height: 100%;
+  background: #d97706;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Các giai đoạn tuần tự */
+.tracker-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tracker-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #78350f;
+}
+
+.tracker-stage-row.active {
+  background: rgba(245, 158, 11, 0.15);
+  font-weight: 700;
+  color: #b45309;
+}
+
+.tracker-stage-row.done {
+  color: #059669;
+  font-weight: 600;
+}
+
+.stage-status-icon {
+  font-size: 13px;
+}
+
+/* Feedback thông báo lỗi / thành công */
+.scenario-feedback {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.scenario-feedback.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.scenario-feedback.success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+@media (max-width: 768px) {
+  .flow-pipeline-steps {
+    grid-template-columns: 1fr;
+  }
+  .scenario-top-row {
+    flex-direction: column;
+  }
+}

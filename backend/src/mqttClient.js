@@ -45,6 +45,14 @@ function handleCommandAck(data, topic) {
     return;
   }
   if (data.status !== "APPLIED" || !data.applied || typeof data.applied !== "object") return;
+
+  // Với các lệnh kịch bản demo (action), ESP32 phản hồi status APPLIED là đã nhận lệnh thành công
+  if (pending.command.action) {
+    console.log(`Command ACK APPLIED: ${pending.deviceId}/${data.commandId} (action: ${pending.command.action})`);
+    settleCommand(data.commandId, null, data);
+    return;
+  }
+
   const matches = Object.entries(pending.command).every(([key, value]) => {
     if (key === "commandId") return true;
     const actual = data.applied[key];

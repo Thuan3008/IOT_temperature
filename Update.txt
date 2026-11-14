@@ -1,0 +1,7 @@
+Sửa hành trình GPS giả lập. Hiện xe chỉ chạy qua 6 tọa độ rồi nhảy về điểm đầu. Cho xe đi theo tuyến dài hơn, dừng tại điểm giao, rồi mới bắt đầu chuyến mới. Trên bản đồ thêm điểm xuất phát, điểm giao và nhãn “Đang chạy/Đang dừng”. Leaflet hỗ trợ cập nhật vị trí xe và đường đi theo từng điểm. Tài liệu Leaflet.
+
+Thêm dòng thời gian chuyến hàng. Hiển thị theo thứ tự: bắt đầu chuyến → xe di chuyển → nhiệt độ vượt ngưỡng → mất mạng → kết nối lại → giao hàng → kết thúc. Mỗi sự kiện có thời gian và vị trí. Hiện Dashboard đã có bản đồ và danh sách cảnh báo, nhưng thiếu một câu chuyện xuyên suốt để người xem theo dõi.
+
+Thêm kịch bản demo một nút bấm. Ví dụ “Chạy kịch bản mất mạng”: dữ liệu vẫn được đo, bộ đệm tăng, thiết bị hiện OFFLINE, sau đó kết nối lại và phát lại gói. Các sự kiện phải đi qua ESP32 → MQTT → Backend → Dashboard như luồng hiện có, không chỉ đổi giao diện giả.
+
+Tạo báo cáo cuối chuyến. Sau khi kết thúc, hiển thị thời gian vận chuyển, nhiệt độ thấp nhất/cao nhất, số lần vượt ngưỡng, thời gian cửa mở và khoảng mất kết nối; cho xuất CSV/PDF.

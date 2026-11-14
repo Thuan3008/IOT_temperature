@@ -98,6 +98,9 @@ bool doorPressActive = false;
 bool doorHoldHandled = false;
 uint32_t doorPressedAtMs = 0;
 uint32_t doorOpenedAtMs = 0;
+uint32_t simulatedOutageUntilMs = 0;
+bool isSimulatedOutageActive = false;
+void startSimulatedOutage(uint32_t durationSeconds);
 uint32_t lastSampleMs = 0;
 uint32_t lastGpsStepMs = 0;
 uint32_t lastWifiAttemptMs = 0;
@@ -241,7 +244,7 @@ void publishStatus(const char* status) {
   if (written > 0) mqtt.publish(statusTopic, payload, true);
 }
 
-void publishCommandAck(const char* commandId, const char* status, const char* reason = nullptr) {
+void publishCommandAck(const char* commandId, const char* status, const char* reason = nullptr, const char* action = nullptr, uint32_t durationSeconds = 0) {
   if (!mqtt.connected() || !commandId || !commandId[0]) return;
   JsonDocument ack;
   ack["type"] = "COMMAND_ACK";
@@ -259,6 +262,12 @@ void publishCommandAck(const char* commandId, const char* status, const char* re
     applied["earlyWarningMinutes"] = earlyWarningMinutes;
     applied["maxDoorOpenSeconds"] = maxDoorOpenSeconds;
     applied["deliveryMode"] = deliveryMode;
+    if (action && action[0]) {
+      applied["action"] = action;
+      if (durationSeconds > 0) {
+        applied["durationSeconds"] = durationSeconds;
+      }
+    }
   }
   char payload[512];
   const size_t written = serializeJson(ack, payload, sizeof(payload));
@@ -295,6 +304,35 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.println("Command rejected: invalid commandId.");
     return;
   }
+
+  // ── Xử lý Kịch bản Demo Một Nút Bấm (One-click Demo Scenarios) ──
+  if (doc["action"].is<const char*>()) {
+    const char* action = doc["action"];
+    if (strcmp(action, "SIMULATE_OUTAGE") == 0 || strcmp(action, "NETWORK_OUTAGE") == 0) {
+      uint32_t duration = 16;
+      if (doc["durationSeconds"].is<uint32_t>() || doc["durationSeconds"].is<int>()) {
+        duration = doc["durationSeconds"].as<uint32_t>();
+      }
+      if (duration < 5) duration = 5;
+      if (duration > 120) duration = 120;
+
+      publishCommandAck(commandId, "APPLIED", nullptr, action, duration);
+      mqtt.loop();
+      delay(30);
+
+      startSimulatedOutage(duration);
+      return;
+    }
+    if (strcmp(action, "RECONNECT_NOW") == 0) {
+      isSimulatedOutageActive = false;
+      publishCommandAck(commandId, "APPLIED", nullptr, action, 0);
+      mqtt.loop();
+      delay(30);
+      setWifiOn();
+      return;
+    }
+  }
+
   auto reject = [commandId](const char* reason) {
     Serial.printf("Command rejected: %s\n", reason);
     publishCommandAck(commandId, "REJECTED", reason);
@@ -635,6 +673,25 @@ void setWifiOn() {
   Serial.println("Wi-Fi reconnect enabled.");
 }
 
+void startSimulatedOutage(uint32_t durationSeconds) {
+  isSimulatedOutageActive = true;
+  simulatedOutageUntilMs = millis() + (durationSeconds * 1000UL);
+
+  // 1. Chủ động gửi trạng thái OFFLINE lên broker/backend trước khi cắt sóng
+  if (mqtt.connected()) {
+    char offlineStatus[128];
+    snprintf(offlineStatus, sizeof(offlineStatus), "{\"deviceId\":\"%s\",\"status\":\"OFFLINE\"}", DEVICE_ID_VALUE);
+    mqtt.publish(statusTopic, offlineStatus, true);
+    mqtt.loop();
+    delay(20);
+  }
+
+  // 2. Cắt Wi-Fi vật lý/logic thực sự
+  setWifiOff();
+  Serial.printf("[DEMO SCENARIO] Kich hoat mat mang trong %lu giay. WiFi tam tat, Ring Buffer dang tich luy goi tin.\n",
+                static_cast<unsigned long>(durationSeconds));
+}
+
 int sensorIndexFromId(const char* id) {
   if (!id || id[0] != 'S' || id[1] < '1' || id[1] > '5' || id[2] != '\0') return -1;
   return id[1] - '1';
@@ -649,6 +706,12 @@ void processSerialCommands() {
     line.trim();
     if (line.equalsIgnoreCase("WIFI_OFF")) setWifiOff();
     else if (line.equalsIgnoreCase("WIFI_ON")) setWifiOn();
+    else if (line.startsWith("DEMO_OUTAGE")) {
+      int sec = 16;
+      if (line.length() > 11) sec = line.substring(11).toInt();
+      if (sec <= 0) sec = 16;
+      startSimulatedOutage(sec);
+    }
     else if (line.startsWith("SENSOR_FAIL ")) {
       int index = sensorIndexFromId(line.substring(12).c_str());
       if (index < 0) Serial.println("Usage: SENSOR_FAIL S1..S5");
@@ -658,7 +721,7 @@ void processSerialCommands() {
       if (index < 0) Serial.println("Usage: SENSOR_RECOVER S1..S5");
       else { sensorForcedFault[index] = false; Serial.printf("S%u sensor fault simulation cleared.\n", static_cast<unsigned>(index + 1)); }
     } else if (line.length()) {
-      Serial.println("Commands: WIFI_OFF, WIFI_ON, SENSOR_FAIL S2, SENSOR_RECOVER S2");
+      Serial.println("Commands: WIFI_OFF, WIFI_ON, DEMO_OUTAGE [sec], SENSOR_FAIL S2, SENSOR_RECOVER S2");
     }
     line = "";
   }
@@ -692,6 +755,14 @@ void setup() {
 
 void loop() {
   const uint32_t now = millis();
+
+  // Kiểm tra thời gian hết hạn ngắt mạng giả lập của kịch bản demo
+  if (isSimulatedOutageActive && now >= simulatedOutageUntilMs) {
+    isSimulatedOutageActive = false;
+    Serial.println("[DEMO SCENARIO] Ket thuc thoi gian ngat mang! Khoi phuc Wi-Fi & MQTT, tien hanh xa Ring Buffer...");
+    setWifiOn();
+  }
+
   processSerialCommands();
   readDoor();
   const bool wifiConnected = WiFi.status() == WL_CONNECTED;
