@@ -528,7 +528,7 @@ export default function RouteManagementView({
               <div className="rm-modal-footer">
                 <button
                   type="button"
-                  className="btn-route-action"
+                  className="btn-modal-cancel"
                   onClick={() => setShowAddModal(false)}
                 >
                   Hủy bỏ

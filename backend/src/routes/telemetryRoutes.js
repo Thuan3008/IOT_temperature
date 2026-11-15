@@ -127,10 +127,20 @@ async function getTripReportData(tripId) {
 }
 
 router.get("/telemetry", async (req, res) => {
-  try { res.json(await listTelemetry()); } catch { res.status(500).json({ message: "Cannot query telemetry" }); }
+  try {
+    res.json(await listTelemetry(req.query.tripId));
+  } catch (err) {
+    console.error("GET /telemetry error:", err);
+    res.status(500).json({ message: "Cannot query telemetry: " + (err.message || "") });
+  }
 });
 router.get("/telemetry/:tripId", async (req, res) => {
-  try { res.json(await listTelemetry(req.params.tripId)); } catch { res.status(500).json({ message: "Cannot query telemetry" }); }
+  try {
+    res.json(await listTelemetry(req.params.tripId));
+  } catch (err) {
+    console.error("GET /telemetry/:tripId error:", err);
+    res.status(500).json({ message: "Cannot query telemetry: " + (err.message || "") });
+  }
 });
 router.get("/sensors", async (req, res) => {
   try { res.json(await listSensors()); } catch { res.status(500).json({ message: "Cannot query sensors" }); }

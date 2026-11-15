@@ -34,7 +34,9 @@ function noteTelemetryArrival(data) {
 async function recordTelemetrySeen(data) {
   noteTelemetryArrival(data);
   const pool = await poolPromise;
-  const request = pool.request().input("deviceId", sql.VarChar(50), data.deviceId);
+  const request = pool.request()
+    .input("deviceId", sql.VarChar(50), data.deviceId)
+    .input("tripId", sql.VarChar(30), data.tripId || null);
   const rows = [];
   for (const [index, sensor] of data.sensors.entries()) {
     const key = `${data.deviceId}:${sensor.sensorId}`;
@@ -57,14 +59,23 @@ async function recordTelemetrySeen(data) {
       INNER JOIN (VALUES ${rows.join(", ")}) AS v(sensor_id, status, valid)
         ON s.sensor_id = v.sensor_id
       WHERE s.device_id = @deviceId;
-      UPDATE a SET recovered_at = SYSDATETIMEOFFSET(), status = 'RESOLVED',
-        resolved_at = COALESCE(a.resolved_at, SYSDATETIMEOFFSET())
-      FROM alerts a
-      WHERE a.device_id = @deviceId AND a.recovered_at IS NULL
-        AND (a.alert_type = 'DEVICE_OFFLINE' OR
-          (a.alert_type = 'SENSOR_OFFLINE' AND EXISTS (
-            SELECT 1 FROM (VALUES ${rows.join(", ")}) AS v(sensor_id, status, valid)
-            WHERE v.sensor_id = a.sensor_id AND v.valid = 1)));
+      IF EXISTS (
+        SELECT 1 FROM alerts a
+        WHERE a.device_id = @deviceId AND a.recovered_at IS NULL
+          AND (@tripId IS NULL OR a.trip_id = @tripId)
+          AND a.alert_type IN ('DEVICE_OFFLINE', 'SENSOR_OFFLINE')
+      )
+      BEGIN
+        UPDATE a SET recovered_at = SYSDATETIMEOFFSET(), status = 'RESOLVED',
+          resolved_at = COALESCE(a.resolved_at, SYSDATETIMEOFFSET())
+        FROM alerts a
+        WHERE a.device_id = @deviceId AND a.recovered_at IS NULL
+          AND (@tripId IS NULL OR a.trip_id = @tripId)
+          AND (a.alert_type = 'DEVICE_OFFLINE' OR
+            (a.alert_type = 'SENSOR_OFFLINE' AND EXISTS (
+              SELECT 1 FROM (VALUES ${rows.join(", ")}) AS v(sensor_id, status, valid)
+              WHERE v.sensor_id = a.sensor_id AND v.valid = 1)));
+      END
     `);
   } catch (error) {
     console.error(`Cannot update device/sensor last_seen: ${error.message}`);

@@ -11,7 +11,7 @@ const config = {
     encrypt: String(process.env.DB_ENCRYPT).toLowerCase() === "true",
     trustServerCertificate: String(process.env.DB_TRUST_SERVER_CERTIFICATE || "true").toLowerCase() === "true"
   },
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
+  pool: { max: 25, min: 2, idleTimeoutMillis: 30000 },
   connectionTimeout: 10000,
   requestTimeout: 30000
 };

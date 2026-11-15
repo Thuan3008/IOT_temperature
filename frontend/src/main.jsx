@@ -287,7 +287,16 @@ function TopBar({ health, lastChecked, onRefresh, isRefreshing, onDriverMode, ac
    TRIP BANNER
    ════════════════════════════════════════════════════════════════ */
 
-function TripBanner({ tripId, deviceId, tripState, limits, vehiclePlate, onNavigate }) {
+function TripBanner({
+  tripId,
+  deviceId,
+  tripState,
+  limits,
+  vehiclePlate,
+  onNavigate,
+  onSelectTrip,
+  tripsList = [],
+}) {
   const stateLabel = TRIP_STATE_LABELS[tripState] || tripState || "—";
   const isCompleted = tripState === "COMPLETED";
 
@@ -297,7 +306,29 @@ function TripBanner({ tripId, deviceId, tripState, limits, vehiclePlate, onNavig
 
       <div className="trip-info">
         <div className="trip-eyebrow">Chuyến đang theo dõi</div>
-        <div className="trip-id">{tripId}</div>
+        {tripsList && tripsList.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2, marginBottom: 4 }}>
+            <select
+              className="trip-select"
+              value={tripId}
+              onChange={(e) => onSelectTrip && onSelectTrip(e.target.value)}
+              aria-label="Chọn chuyến hàng theo dõi"
+            >
+              {tripsList.map((t) => (
+                <option key={t.trip_id} value={t.trip_id}>
+                  {t.trip_id} ({t.trip_state || t.status || "—"}) {t.vehicle_plate ? `· ${t.vehicle_plate}` : ""}
+                </option>
+              ))}
+              {!tripsList.some((t) => t.trip_id === tripId) && (
+                <option value={tripId}>
+                  {tripId} (Hiện tại)
+                </option>
+              )}
+            </select>
+          </div>
+        ) : (
+          <div className="trip-id">{tripId}</div>
+        )}
         <div className="trip-meta">
           <span>Thiết bị {deviceId}</span>
           <span className="trip-meta-sep">·</span>
@@ -330,13 +361,13 @@ function TripBanner({ tripId, deviceId, tripState, limits, vehiclePlate, onNavig
           className="quick-card-btn"
           style={{
             marginLeft: "auto",
-            background: isCompleted ? "var(--color-primary)" : "rgba(255, 255, 255, 0.08)",
-            color: "var(--color-text)",
-            border: "1px solid rgba(255, 255, 255, 0.15)",
+            background: isCompleted ? "var(--color-primary)" : "rgba(255, 255, 255, 0.16)",
+            color: "#ffffff",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
             padding: "8px 14px",
             borderRadius: 8,
             cursor: "pointer",
-            fontWeight: 600,
+            fontWeight: 700,
             display: "flex",
             alignItems: "center",
             gap: 6
@@ -444,14 +475,19 @@ function KpiGrid({ latestPacket, packets, latestBySensor, limits, outOfRange }) 
    TREND CHART
    ════════════════════════════════════════════════════════════════ */
 
-function TrendChart({ packets, limits }) {
+function TrendChart({ packets, limits, tripId }) {
   const points = useMemo(() => [...packets].reverse().slice(-24), [packets]);
 
   if (!points.length) {
     return (
-      <div className="chart-empty">
-        <div className="chart-empty-icon">📊</div>
-        <div>Đang chờ dữ liệu telemetry từ ESP32…</div>
+      <div className="chart-empty" style={{ padding: "48px 24px", textAlign: "center" }}>
+        <div className="chart-empty-icon" style={{ fontSize: 36, marginBottom: 10 }}>📊</div>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-2)" }}>
+          Chưa có dữ liệu đo đạc cho {tripId ? `chuyến ${tripId}` : "chuyến này"}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--color-text-4)", marginTop: 6 }}>
+          Đang chờ bản tin telemetry từ thiết bị ESP32...
+        </div>
       </div>
     );
   }
@@ -460,10 +496,14 @@ function TrendChart({ packets, limits }) {
   const pad = { top: 18, right: 16, bottom: 30, left: 44 };
 
   const allValues = points.flatMap((p) =>
-    p.sensors.map((s) => s.temperature).filter(Number.isFinite)
+    (p.sensors || []).map((s) => s.temperature).filter(Number.isFinite)
   );
-  const minVal = Math.min(limits.min ?? Math.min(...allValues), ...allValues) - 1;
-  const maxVal = Math.max(limits.max ?? Math.max(...allValues), ...allValues) + 1;
+  const minVal = allValues.length
+    ? Math.min(limits.min ?? Math.min(...allValues), ...allValues) - 1
+    : (limits.min ?? 0) - 1;
+  const maxVal = allValues.length
+    ? Math.max(limits.max ?? Math.max(...allValues), ...allValues) + 1
+    : (limits.max ?? 10) + 1;
   const range  = maxVal - minVal || 1;
 
   const px = (i) =>
@@ -787,6 +827,8 @@ function OverviewView({
   alerts,
   onNavigate,
   activeRoute,
+  onSelectTrip,
+  tripsList,
 }) {
   const openAlerts = alerts.filter((a) => a.status === "OPEN");
 
@@ -799,6 +841,8 @@ function OverviewView({
         limits={limits}
         vehiclePlate={vehiclePlate}
         onNavigate={onNavigate}
+        onSelectTrip={onSelectTrip}
+        tripsList={tripsList}
       />
 
       <KpiGrid
@@ -814,21 +858,21 @@ function OverviewView({
           <div className="panel-header">
             <div className="panel-title-group">
               <div className="panel-eyebrow">Nhiệt độ theo thời gian</div>
-              <div className="panel-title">Diễn biến nhiệt độ</div>
+              <div className="panel-title">Diễn biến nhiệt độ · Chuyến {tripId}</div>
             </div>
             <div className="live-badge">
               <span className="live-dot" aria-hidden="true" />
               LIVE · 4 GIÂY
             </div>
           </div>
-          <TrendChart packets={packets} limits={limits} />
+          <TrendChart packets={packets} limits={limits} tripId={tripId} />
         </article>
 
         <article className="panel" id="sensors-panel" aria-label="Danh sách cảm biến">
           <div className="panel-header">
             <div className="panel-title-group">
-              <div className="panel-eyebrow">Thiết bị ESP32</div>
-              <div className="panel-title">Cảm biến</div>
+              <div className="panel-eyebrow">Thiết bị ESP32 ({deviceId})</div>
+              <div className="panel-title">Cảm biến · Chuyến {tripId}</div>
             </div>
             <span className="sensor-count-badge">
               {[...latestBySensor.values()].filter((r) => r.sensor_status === "ONLINE").length}/5 online
@@ -951,6 +995,8 @@ function ControlsView({
   onRefresh,
   onNavigate,
   onTripStarted,
+  tripsList,
+  onSelectTrip,
 }) {
   return (
     <div className="page-view controls-view">
@@ -961,6 +1007,8 @@ function ControlsView({
         limits={limits}
         vehiclePlate={vehiclePlate}
         onNavigate={onNavigate}
+        onSelectTrip={onSelectTrip}
+        tripsList={tripsList}
       />
 
       <ControlPanel
@@ -1257,6 +1305,7 @@ function App() {
   const [driverMode,    setDriverMode]    = useState(false);
   const [liveState,     setLiveState]     = useState(null);
   const [currentTripId, setCurrentTripId] = useState(null);
+  const [tripsList,     setTripsList]     = useState([]);
   const liveRowsRef = useRef([]);
 
   /* ── Tuyến đường & Trạng thái mô phỏng đồng bộ toàn hệ thống (Option C) ── */
@@ -1328,11 +1377,12 @@ function App() {
   const refresh = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true);
     try {
-      const [healthRes, telRes, sensorRes, deviceRes] = await Promise.all([
+      const [healthRes, telRes, sensorRes, deviceRes, tripsRes] = await Promise.all([
         fetch(`${API_BASE}/api/health`),
         fetch(`${API_BASE}/api/telemetry`),
         fetch(`${API_BASE}/api/sensors`),
         fetch(`${API_BASE}/api/devices`),
+        fetch(`${API_BASE}/api/trips`),
       ]);
       const healthData = await healthRes.json();
       if (!healthRes.ok) throw new Error(`API chưa sẵn sàng (${healthRes.status})`);
@@ -1343,6 +1393,14 @@ function App() {
       if (!sensorRes.ok || !deviceRes.ok) throw new Error("Không tải được trạng thái thiết bị/cảm biến");
       const [sensors, devices] = await Promise.all([sensorRes.json(), deviceRes.json()]);
 
+      let fetchedTrips = [];
+      if (tripsRes.ok) {
+        try {
+          fetchedTrips = await tripsRes.json();
+          setTripsList(fetchedTrips);
+        } catch {}
+      }
+
       const next = getReadings(telData);
       setReadings(mergeLiveReadings(next, liveRowsRef.current));
       setSensorStates(sensors);
@@ -1351,16 +1409,19 @@ function App() {
       setError("");
       setLastChecked(new Date());
 
-      // Tìm chuyến đang chạy từ Backend
+      // Tìm chuyến đang chạy từ Backend (IN_TRANSIT)
       let activeTrip = null;
       try {
         const activeRes = await fetch(`${API_BASE}/api/trips/active?deviceId=ESP32-01`);
         if (activeRes.ok) activeTrip = await activeRes.json();
       } catch {}
 
-      const effectiveTripId = currentTripId || activeTrip?.trip_id || next[0]?.trip_id;
-      if (activeTrip && !currentTripId) {
-        setCurrentTripId(activeTrip.trip_id);
+      // Xác định chuyến cần theo dõi:
+      // 1. Người dùng đã chọn (currentTripId) -> giữ nguyên
+      // 2. Chưa chọn -> ưu tiên activeTrip (đang chạy), rồi đến chuyến mới nhất trong telemetry, rồi đến chuyến đầu trong DB
+      const effectiveTripId = currentTripId || activeTrip?.trip_id || next[0]?.trip_id || fetchedTrips[0]?.trip_id || "TRIP001";
+      if (!currentTripId && effectiveTripId) {
+        setCurrentTripId(effectiveTripId);
       }
 
       const alertQuery = effectiveTripId ? `&tripId=${encodeURIComponent(effectiveTripId)}` : "";
@@ -1368,24 +1429,32 @@ function App() {
         fetch(`${API_BASE}/api/alerts?status=OPEN${alertQuery}`),
         fetch(`${API_BASE}/api/alerts?status=RESOLVED${alertQuery}`),
       ]);
-      if (!openRes.ok || !resolvedRes.ok) throw new Error("Không tải được cảnh báo");
-      const [openAlerts, resolvedAlerts] = await Promise.all([openRes.json(), resolvedRes.json()]);
-      setAlerts([...openAlerts, ...resolvedAlerts]);
+      if (openRes.ok && resolvedRes.ok) {
+        const [openAlerts, resolvedAlerts] = await Promise.all([openRes.json(), resolvedRes.json()]);
+        setAlerts([...openAlerts, ...resolvedAlerts]);
+      }
 
-      if (activeTrip) {
-        setLimits({ min: activeTrip.min_temperature ?? null, max: activeTrip.max_temperature ?? null });
-        setTripState(activeTrip.trip_state || "UNKNOWN");
-        setDeliveryMode(Boolean(activeTrip.delivery_mode));
-        setVehiclePlate(activeTrip.vehicle_plate || "");
+      // Luôn đồng bộ cấu hình (limits, trip_state, vehiclePlate) theo đúng chuyến effectiveTripId
+      const targetTrip = (activeTrip && activeTrip.trip_id === effectiveTripId)
+        ? activeTrip
+        : fetchedTrips.find((t) => t.trip_id === effectiveTripId);
+
+      if (targetTrip) {
+        setLimits({ min: targetTrip.min_temperature ?? null, max: targetTrip.max_temperature ?? null });
+        setTripState(targetTrip.trip_state || "UNKNOWN");
+        setDeliveryMode(Boolean(targetTrip.delivery_mode));
+        setVehiclePlate(targetTrip.vehicle_plate || "");
       } else if (effectiveTripId) {
-        const tripRes = await fetch(`${API_BASE}/api/trips/${encodeURIComponent(effectiveTripId)}`);
-        if (tripRes.ok) {
-          const trip = await tripRes.json();
-          setLimits({ min: trip.min_temperature ?? null, max: trip.max_temperature ?? null });
-          setTripState(trip.trip_state || "UNKNOWN");
-          setDeliveryMode(Boolean(trip.delivery_mode));
-          setVehiclePlate(trip.vehicle_plate || "");
-        }
+        try {
+          const tripRes = await fetch(`${API_BASE}/api/trips/${encodeURIComponent(effectiveTripId)}`);
+          if (tripRes.ok) {
+            const trip = await tripRes.json();
+            setLimits({ min: trip.min_temperature ?? null, max: trip.max_temperature ?? null });
+            setTripState(trip.trip_state || "UNKNOWN");
+            setDeliveryMode(Boolean(trip.delivery_mode));
+            setVehiclePlate(trip.vehicle_plate || "");
+          }
+        } catch {}
       }
     } catch (e) {
       setHealth("offline");
@@ -1393,7 +1462,7 @@ function App() {
     } finally {
       if (manual) setIsRefreshing(false);
     }
-  }, []);
+  }, [currentTripId]);
 
   // MQTT samples reach this stream before the slower SQL history write.
   useEffect(() => {
@@ -1452,42 +1521,56 @@ function App() {
 
   /* ── Derived data ── */
   const packets = useMemo(() => getPacketGroups(readings), [readings]);
+  const tripId   = currentTripId || packets[0]?.trip_id || "TRIP001";
+
+  // Lọc riêng toàn bộ bản tin của chuyến đang theo dõi
+  const tripPackets = useMemo(
+    () => packets.filter((p) => p.trip_id === tripId),
+    [packets, tripId]
+  );
+
   // Wokwi's simulated clock can lag behind wall time. The packet that just
   // arrived over SSE is the current physical reading even if an SQL row has
   // a later measured_at timestamp.
   const freshLivePacket = liveState && Date.now() - liveState.receivedAt < 15000
     ? packets.find((packet) => packet.packet_id === liveState.packetId || packet.message_id === liveState.messageId)
     : null;
-  const latestPacket = freshLivePacket || packets[0];
+
+  const hasFreshLive = Boolean(freshLivePacket && liveState.deviceId === "ESP32-01" && liveState.tripId === tripId);
+  const tripLatestPacket = (hasFreshLive ? freshLivePacket : null) || tripPackets[0] || null;
+
+  const latestPacket = freshLivePacket || packets[0] || null;
   const displayPackets = freshLivePacket
     ? [freshLivePacket, ...packets.filter((packet) => packet.packet_id !== freshLivePacket.packet_id)]
     : packets;
+  const tripDisplayPackets = hasFreshLive
+    ? [freshLivePacket, ...tripPackets.filter((packet) => packet.packet_id !== freshLivePacket.packet_id)]
+    : tripPackets;
 
-  const tripId   = currentTripId || latestPacket?.trip_id || "TRIP001";
-  const deviceId = latestPacket?.device_id || "ESP32-01";
-  const hasFreshLive = Boolean(freshLivePacket && liveState.deviceId === deviceId && liveState.tripId === tripId);
+  const deviceId = tripLatestPacket?.device_id || latestPacket?.device_id || "ESP32-01";
   const deviceOffline = !hasFreshLive && deviceStates.find((device) => device.device_id === deviceId)?.status !== "ONLINE";
+  const isTripCompleted = tripState === "COMPLETED";
 
   const latestBySensor = useMemo(() => {
     const map = new Map();
-    if (hasFreshLive) {
+    if (hasFreshLive && freshLivePacket) {
       for (const reading of freshLivePacket.sensors) map.set(reading.sensor_id, reading);
     }
     for (const r of readings) {
-      if (r.device_id === deviceId && r.trip_id === tripId && !map.has(r.sensor_id)) map.set(r.sensor_id, r);
+      if (r.trip_id === tripId && !map.has(r.sensor_id)) map.set(r.sensor_id, r);
     }
     for (const id of SENSOR_IDS) {
       const reading = map.get(id);
       const state = sensorStates.find((sensor) => sensor.device_id === deviceId && sensor.sensor_id === id);
-      const status = deviceOffline ? "OFFLINE"
-        : hasFreshLive ? (reading?.sensor_status || "OFFLINE") : (state?.status || "OFFLINE");
-      // SQL status phản ánh timeout/LWT mới nhất; không dùng số đo trong packet cũ.
+      const status = isTripCompleted ? "COMPLETED" : (deviceOffline ? "OFFLINE"
+        : hasFreshLive ? (reading?.sensor_status || "OFFLINE") : (state?.status || "OFFLINE"));
+      // SQL status phản ánh timeout/LWT mới nhất; nếu chuyến hoàn thành hoặc online thì giữ nhiệt độ đo được.
       map.set(id, { ...reading, sensor_id: id, sensor_status: status,
-        temperature: status === "ONLINE" ? reading?.temperature ?? null : null,
-        humidity: status === "ONLINE" ? reading?.humidity ?? null : null });
+        temperature: (isTripCompleted || status === "ONLINE") ? reading?.temperature ?? null : null,
+        humidity: (isTripCompleted || status === "ONLINE") ? reading?.humidity ?? null : null });
     }
     return map;
-  }, [readings, sensorStates, deviceOffline, hasFreshLive, freshLivePacket, deviceId, tripId]);
+  }, [readings, sensorStates, deviceOffline, hasFreshLive, freshLivePacket, deviceId, tripId, isTripCompleted]);
 
   const outOfRange = useMemo(
     () =>
@@ -1504,7 +1587,7 @@ function App() {
     () =>
       packets
         .filter(
-          (p) => p.trip_id === tripId && p.device_id === deviceId && isValidLocation(p)
+          (p) => p.trip_id === tripId && isValidLocation(p)
         )
         .map((p) => ({
           latitude: p.latitude,
@@ -1513,18 +1596,29 @@ function App() {
           vehicleStatus: p.vehicle_status || p.vehicleStatus,
         }))
         .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)),
-    [packets, tripId, deviceId]
+    [packets, tripId]
   );
 
-  const currentLocation = hasFreshLive && isValidLocation(latestPacket)
+  const currentLocation = hasFreshLive && isValidLocation(tripLatestPacket)
     ? {
-        latitude: latestPacket.latitude,
-        longitude: latestPacket.longitude,
-        timestamp: latestPacket.measured_at,
-        vehicleStatus: latestPacket.vehicle_status || latestPacket.vehicleStatus,
+        latitude: tripLatestPacket.latitude,
+        longitude: tripLatestPacket.longitude,
+        timestamp: tripLatestPacket.measured_at,
+        vehicleStatus: tripLatestPacket.vehicle_status || tripLatestPacket.vehicleStatus,
       }
     : routeHistory.at(-1) || null;
   const temperatures = [...latestBySensor.values()].map((r) => r.temperature).filter(Number.isFinite);
+
+  const handleSelectTrip = useCallback((newTripId) => {
+    setCurrentTripId(newTripId);
+    const found = tripsList.find((t) => t.trip_id === newTripId);
+    if (found) {
+      setLimits({ min: found.min_temperature ?? null, max: found.max_temperature ?? null });
+      setTripState(found.trip_state || "UNKNOWN");
+      setDeliveryMode(Boolean(found.delivery_mode));
+      setVehiclePlate(found.vehicle_plate || "");
+    }
+  }, [tripsList]);
 
   /* ── Section navigation ── */
   function navigateTo(sectionId) {
@@ -1613,14 +1707,16 @@ function App() {
               tripState={tripState}
               limits={limits}
               vehiclePlate={vehiclePlate}
-              latestPacket={latestPacket}
-              packets={packets}
+              latestPacket={tripLatestPacket}
+              packets={tripPackets}
               latestBySensor={latestBySensor}
               outOfRange={outOfRange}
               currentLocation={currentLocation}
               alerts={alerts}
               onNavigate={navigateTo}
               activeRoute={activeRoute}
+              tripsList={tripsList}
+              onSelectTrip={handleSelectTrip}
             />
           )}
 
@@ -1637,10 +1733,12 @@ function App() {
               setLimits={setLimits}
               vehiclePlate={vehiclePlate}
               health={health}
-              latestPacket={latestPacket}
+              latestPacket={tripLatestPacket || latestPacket}
               onRefresh={() => refresh(true)}
               onNavigate={navigateTo}
               onTripStarted={handleTripStarted}
+              tripsList={tripsList}
+              onSelectTrip={handleSelectTrip}
             />
           )}
 
@@ -1649,7 +1747,7 @@ function App() {
             <SensorsView
               latestBySensor={latestBySensor}
               limits={limits}
-              packets={packets}
+              packets={tripPackets}
               outOfRange={outOfRange}
             />
           )}
@@ -1697,7 +1795,7 @@ function App() {
               tripState={tripState}
               limits={limits}
               vehiclePlate={vehiclePlate}
-              packets={displayPackets}
+              packets={tripDisplayPackets}
               alerts={alerts}
               onEndTrip={handleEndTrip}
               onNavigate={navigateTo}
@@ -1712,10 +1810,7 @@ function App() {
               simState={simState}
               setSimState={setSimState}
               tripId={tripId}
-              onSelectTrip={(newTripId) => {
-                setCurrentTripId(newTripId);
-                refresh(true);
-              }}
+              onSelectTrip={handleSelectTrip}
               onNavigate={navigateTo}
             />
           )}

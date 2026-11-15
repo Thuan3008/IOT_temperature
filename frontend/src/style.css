@@ -33,6 +33,7 @@
   --color-text-2:         #334155;
   --color-text-3:         #64748b;
   --color-text-4:         #94a3b8;
+  --color-text-dim:       #64748b;
 
   /* Sidebar */
   --sidebar-bg:           #0f2830;
@@ -433,6 +434,38 @@ img { max-width: 100%; }
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.1;
+}
+
+.trip-select {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  transition: all var(--transition);
+  max-width: 100%;
+}
+
+.trip-select:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.trip-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
+}
+
+.trip-select option {
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .trip-meta {
