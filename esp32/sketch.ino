@@ -101,6 +101,8 @@ uint32_t doorOpenedAtMs = 0;
 uint32_t simulatedOutageUntilMs = 0;
 bool isSimulatedOutageActive = false;
 void startSimulatedOutage(uint32_t durationSeconds);
+void setWifiOn();
+void setWifiOff();
 uint32_t lastSampleMs = 0;
 uint32_t lastGpsStepMs = 0;
 uint32_t lastWifiAttemptMs = 0;
